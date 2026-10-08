@@ -1,0 +1,15 @@
+frontend/.dart_tool/
+frontend/build/
+backend/node_modules/
+backend/.env
+backend/uploads/*
+!backend/uploads/.gitkeep
+ml/.venv/
+ml/data/raw/*
+ml/data/processed/*
+ml/models/*
+!ml/**/.gitkeep
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
