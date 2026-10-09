@@ -1,5 +1,9 @@
-rimport 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+
+import '../../../profile/presentation/screens/profile_screen.dart';
+import '../../../my_listings/presentation/screens/my_listings_screen.dart';
+import 'filter_screen.dart';
 
 const _background = Color(0xFFFBF9FF);
 const _surface = Colors.white;
@@ -20,6 +24,8 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   final _searchController = TextEditingController();
   int _selectedNav = 0;
+  double _radius = 5;
+  String _activeCategory = 'All';
 
   @override
   void dispose() {
@@ -70,7 +76,7 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
       ),
       floatingActionButton: FloatingActionButton(
-        onPressed: () {},
+        onPressed: () => _showLocalMessage('Add listing is ready for your next item.'),
         backgroundColor: _darkTeal,
         foregroundColor: Colors.white,
         elevation: 3,
@@ -111,30 +117,37 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
         _roundIcon(Icons.notifications_none_rounded, hasDot: true),
         const SizedBox(width: 8),
-        _roundIcon(Icons.person_outline_rounded),
+        _roundIcon(
+          Icons.person_outline_rounded,
+          onTap: () => _openProfile(context),
+        ),
       ],
     );
   }
 
-  Widget _roundIcon(IconData icon, {bool hasDot = false}) {
+  Widget _roundIcon(IconData icon, {bool hasDot = false, VoidCallback? onTap}) {
     return Stack(
       clipBehavior: Clip.none,
       children: [
-        Container(
-          width: 40,
-          height: 40,
-          decoration: const BoxDecoration(
-            color: _surface,
-            shape: BoxShape.circle,
-            boxShadow: [
-              BoxShadow(
-                color: Color(0x0D000000),
-                blurRadius: 10,
-                offset: Offset(0, 3),
-              ),
-            ],
+        InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(24),
+          child: Container(
+            width: 40,
+            height: 40,
+            decoration: const BoxDecoration(
+              color: _surface,
+              shape: BoxShape.circle,
+              boxShadow: [
+                BoxShadow(
+                  color: Color(0x0D000000),
+                  blurRadius: 10,
+                  offset: Offset(0, 3),
+                ),
+              ],
+            ),
+            child: Icon(icon, size: 21, color: _darkTeal),
           ),
-          child: Icon(icon, size: 21, color: _darkTeal),
         ),
         if (hasDot)
           Positioned(
@@ -177,7 +190,19 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         ),
         const SizedBox(width: 10),
-        Container(
+        InkWell(
+          onTap: () async {
+            final result = await Navigator.of(context).push<FilterResult>(
+              MaterialPageRoute(builder: (_) => const FilterScreen()),
+            );
+            if (!mounted || result == null) return;
+            setState(() {
+              _radius = result.radius;
+              _activeCategory = result.category;
+            });
+          },
+          borderRadius: BorderRadius.circular(14),
+          child: Container(
           width: 48,
           height: 48,
           decoration: BoxDecoration(
@@ -185,6 +210,7 @@ class _HomeScreenState extends State<HomeScreen> {
             borderRadius: BorderRadius.circular(14),
           ),
           child: const Icon(Icons.tune_rounded, color: Colors.white),
+          ),
         ),
       ],
     );
@@ -238,7 +264,12 @@ class _HomeScreenState extends State<HomeScreen> {
               overlayColor: _cyanSoft,
               trackHeight: 4,
             ),
-            child: Slider(value: 5, min: 1, max: 15, onChanged: (_) {}),
+            child: Slider(
+              value: _radius.clamp(1, 15),
+              min: 1,
+              max: 15,
+              onChanged: (value) => setState(() => _radius = value),
+            ),
           ),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -291,12 +322,12 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
         const SizedBox(width: 6),
         Text(
-          '${_products.length} items nearby',
+          '${_activeCategory == 'All' ? _products.length : 2} items nearby',
           style: GoogleFonts.plusJakartaSans(fontSize: 11, color: _muted),
         ),
         const Spacer(),
         TextButton.icon(
-          onPressed: () {},
+          onPressed: () => _showLocalMessage('Sorted by nearest items.'),
           style: TextButton.styleFrom(
             padding: EdgeInsets.zero,
             foregroundColor: _darkTeal,
@@ -338,7 +369,7 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget _navItem(IconData icon, String label, int index) {
     final selected = _selectedNav == index;
     return InkWell(
-      onTap: () => setState(() => _selectedNav = index),
+      onTap: () => _onTapNav(context, index),
       borderRadius: BorderRadius.circular(12),
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
@@ -359,6 +390,31 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
       ),
     );
+  }
+
+  void _onTapNav(BuildContext context, int index) {
+    setState(() => _selectedNav = index);
+    if (index == 3) {
+      _openProfile(context);
+    } else if (index == 2) {
+      _openListings(context);
+    }
+  }
+
+  void _openProfile(BuildContext context) {
+    Navigator.of(
+      context,
+    ).push(MaterialPageRoute(builder: (_) => const ProfileScreen()));
+  }
+
+  void _openListings(BuildContext context) {
+    Navigator.of(
+      context,
+    ).push(MaterialPageRoute(builder: (_) => const MyListingsScreen()));
+  }
+
+  void _showLocalMessage(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
   }
 }
 

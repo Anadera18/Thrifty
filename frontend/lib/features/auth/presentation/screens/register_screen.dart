@@ -6,7 +6,6 @@ const _ink = Color(0xFF111827);
 const _muted = Color(0xFF5B6270);
 const _fieldBg = Color(0xFFF2F0FB);
 const _green = Color(0xFF14532D);
-const _line = Color(0xFFE5E3EF);
 
 class RegisterScreen extends StatefulWidget {
   const RegisterScreen({super.key});
@@ -25,7 +24,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
   bool _hidePassword = true;
   bool _hideConfirmPassword = true;
   bool _agreedToTerms = false;
-  String _accountType = 'Buyer';
 
   @override
   void dispose() {
@@ -51,10 +49,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
       return;
     }
 
-    // TODO: Send name, email, password, and _accountType to your auth provider/API.
+    // TODO: Send name, email, and password to your auth provider/API.
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-          content: Text('Registration form ready for $_accountType signup.')),
+      const SnackBar(content: Text('Registration form is ready to submit.')),
     );
   }
 
@@ -240,10 +237,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
               onFieldSubmitted: (_) => _createAccount(),
             ),
             const SizedBox(height: 14),
-            _label('Account Intent'),
-            const SizedBox(height: 5),
-            _buildAccountTypePicker(),
-            const SizedBox(height: 12),
             _buildTermsCheckbox(),
             const SizedBox(height: 14),
             SizedBox(
@@ -276,64 +269,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
               ),
             ),
           ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildAccountTypePicker() {
-    return Container(
-      padding: const EdgeInsets.all(3),
-      decoration: BoxDecoration(
-        color: _fieldBg,
-        borderRadius: BorderRadius.circular(9),
-      ),
-      child: Row(
-        children: [
-          _accountTypeButton(
-            title: 'Buyer',
-            icon: Icons.shopping_bag_outlined,
-          ),
-          _accountTypeButton(
-            title: 'Seller',
-            icon: Icons.storefront_outlined,
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _accountTypeButton({
-    required String title,
-    required IconData icon,
-  }) {
-    final selected = _accountType == title;
-
-    return Expanded(
-      child: Material(
-        color: selected ? Colors.white : Colors.transparent,
-        borderRadius: BorderRadius.circular(7),
-        child: InkWell(
-          borderRadius: BorderRadius.circular(7),
-          onTap: () => setState(() => _accountType = title),
-          child: SizedBox(
-            height: 31,
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(icon, size: 14, color: _ink),
-                const SizedBox(width: 5),
-                Text(
-                  title,
-                  style: GoogleFonts.plusJakartaSans(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w600,
-                    color: _ink,
-                  ),
-                ),
-              ],
-            ),
-          ),
         ),
       ),
     );
@@ -398,28 +333,34 @@ class _RegisterScreenState extends State<RegisterScreen> {
   }
 
   Widget _buildLoginLink() {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        Text(
-          'Already have an account? ',
-          style: GoogleFonts.plusJakartaSans(
-            fontSize: 12,
-            color: _muted,
-          ),
-        ),
-        GestureDetector(
-          onTap: () => Navigator.maybePop(context),
-          child: Text(
-            'Login',
-            style: GoogleFonts.plusJakartaSans(
-              fontSize: 12,
-              color: const Color(0xFF075C7A),
-              decoration: TextDecoration.underline,
+    return TextButton(
+      onPressed: () => Navigator.of(context).pop(),
+      style: TextButton.styleFrom(
+        foregroundColor: const Color(0xFF075C7A),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+      ),
+      child: Text.rich(
+        TextSpan(
+          children: [
+            TextSpan(
+              text: 'Already have an account? ',
+              style: GoogleFonts.plusJakartaSans(
+                fontSize: 12,
+                color: _muted,
+              ),
             ),
-          ),
+            TextSpan(
+              text: 'Login',
+              style: GoogleFonts.plusJakartaSans(
+                fontSize: 12,
+                color: const Color(0xFF075C7A),
+                decoration: TextDecoration.underline,
+              ),
+            ),
+          ],
         ),
-      ],
+      ),
     );
   }
 
