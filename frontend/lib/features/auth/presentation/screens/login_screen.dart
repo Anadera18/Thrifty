@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import 'register_screen.dart';
-import '../widgets/thrifty_logo.dart';
 
 const _bg = Color(0xFFFBF9FF);
 const _ink = Color(0xFF111827);
@@ -49,8 +48,6 @@ class _LoginScreenState extends State<LoginScreen> {
                   _buildHeader(),
                   const SizedBox(height: 24),
                   _buildFormCard(),
-                  const SizedBox(height: 20),
-                  _buildBadges(),
                   const SizedBox(height: 16),
                   _buildFooter(),
                 ],
@@ -66,57 +63,14 @@ class _LoginScreenState extends State<LoginScreen> {
   Widget _buildHeader() {
     return Column(
       children: [
-        Container(
-          width: 64,
-          height: 64,
-          padding: const EdgeInsets.all(5),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(18),
-            boxShadow: const [
-              BoxShadow(
-                color: Color(0x14000000),
-                blurRadius: 16,
-                offset: Offset(0, 6),
-              ),
-            ],
+        Text(
+          'THRIFTY',
+          style: GoogleFonts.plusJakartaSans(
+            fontSize: 22,
+            fontWeight: FontWeight.w800,
+            letterSpacing: 0.4,
+            color: _ink,
           ),
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(14),
-            child: const ThriftyLogo(size: 54),
-          ),
-        ),
-        const SizedBox(height: 14),
-        Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              'THRIFTY',
-              style: GoogleFonts.plusJakartaSans(
-                fontSize: 22,
-                fontWeight: FontWeight.w800,
-                letterSpacing: 0.4,
-                color: _ink,
-              ),
-            ),
-            const SizedBox(width: 8),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-              decoration: BoxDecoration(
-                color: const Color(0xFFA5F3FC),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Text(
-                'CIRCULAR',
-                style: GoogleFonts.plusJakartaSans(
-                  fontSize: 9,
-                  fontWeight: FontWeight.w800,
-                  letterSpacing: 0.6,
-                  color: const Color(0xFF0E4B52),
-                ),
-              ),
-            ),
-          ],
         ),
         const SizedBox(height: 6),
         SizedBox(
@@ -347,13 +301,13 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   Widget _label(String text) => Text(
-    text,
-    style: GoogleFonts.plusJakartaSans(
-      fontSize: 12.5,
-      fontWeight: FontWeight.w700,
-      color: _ink,
-    ),
-  );
+        text,
+        style: GoogleFonts.plusJakartaSans(
+          fontSize: 12.5,
+          fontWeight: FontWeight.w700,
+          color: _ink,
+        ),
+      );
 
   InputDecoration _inputDecoration({
     required String hint,
@@ -383,22 +337,7 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 
-  // ---------- Badges + footer ----------
-  Widget _buildBadges() {
-    return const Wrap(
-      alignment: WrapAlignment.center,
-      spacing: 10,
-      runSpacing: 8,
-      children: [
-        _InfoChip(
-          icon: Icons.verified_user_outlined,
-          text: 'Secure Authentication',
-        ),
-        _InfoChip(icon: Icons.eco_outlined, text: '100% Circular'),
-      ],
-    );
-  }
-
+  // ---------- Footer ----------
   Widget _buildFooter() {
     final base = GoogleFonts.plusJakartaSans(
       fontSize: 10.5,
@@ -424,39 +363,6 @@ class _LoginScreenState extends State<LoginScreen> {
           ],
         ),
         textAlign: TextAlign.center,
-      ),
-    );
-  }
-}
-
-class _InfoChip extends StatelessWidget {
-  const _InfoChip({required this.icon, required this.text});
-
-  final IconData icon;
-  final String text;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-      decoration: BoxDecoration(
-        color: const Color(0xFFEFEDFA),
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 14, color: _green),
-          const SizedBox(width: 6),
-          Text(
-            text,
-            style: GoogleFonts.plusJakartaSans(
-              fontSize: 10.5,
-              fontWeight: FontWeight.w600,
-              color: const Color(0xFF374151),
-            ),
-          ),
-        ],
       ),
     );
   }

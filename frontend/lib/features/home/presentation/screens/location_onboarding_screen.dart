@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:geolocator/geolocator.dart';
 
 import '../../../auth/presentation/widgets/thrifty_logo.dart';
 import '../widgets/location_radar.dart';
+import 'home_screen.dart';
 
 const _bg = Color(0xFFFBF9FF);
 const _ink = Color(0xFF111827);
@@ -16,10 +18,23 @@ class LocationOnboardingScreen extends StatelessWidget {
   const LocationOnboardingScreen({super.key});
 
   Future<void> _onAllowLocation(BuildContext context) async {
-    // TODO: request permission with geolocator, then go to Home.
-    // final perm = await Geolocator.requestPermission();
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Location access (mock)')),
+    final serviceEnabled = await Geolocator.isLocationServiceEnabled();
+    if (!serviceEnabled && context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Location services are disabled. Continuing without location.'),
+        ),
+      );
+    } else {
+      final permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        await Geolocator.requestPermission();
+      }
+    }
+
+    if (!context.mounted) return;
+    Navigator.of(context).pushReplacement(
+      MaterialPageRoute(builder: (_) => const HomeScreen()),
     );
   }
 

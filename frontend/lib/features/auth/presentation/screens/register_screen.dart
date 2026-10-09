@@ -6,7 +6,6 @@ const _ink = Color(0xFF111827);
 const _muted = Color(0xFF5B6270);
 const _fieldBg = Color(0xFFF2F0FB);
 const _green = Color(0xFF14532D);
-const _teal = Color(0xFFA5F3FC);
 const _line = Color(0xFFE5E3EF);
 
 class RegisterScreen extends StatefulWidget {
@@ -45,7 +44,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
     if (!_agreedToTerms) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Please agree to the Terms of Service and Privacy Policy.'),
+          content:
+              Text('Please agree to the Terms of Service and Privacy Policy.'),
         ),
       );
       return;
@@ -53,7 +53,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
     // TODO: Send name, email, password, and _accountType to your auth provider/API.
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('Registration form ready for $_accountType signup.')),
+      SnackBar(
+          content: Text('Registration form ready for $_accountType signup.')),
     );
   }
 
@@ -74,8 +75,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   _buildFormCard(),
                   const SizedBox(height: 16),
                   _buildLoginLink(),
-                  const SizedBox(height: 10),
-                  _buildBenefits(),
                 ],
               ),
             ),
@@ -88,20 +87,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
   Widget _buildHeader() {
     return Column(
       children: [
-        Container(
-          width: 46,
-          height: 46,
-          decoration: const BoxDecoration(
-            color: _teal,
-            shape: BoxShape.circle,
-          ),
-          child: const Icon(
-            Icons.recycling_rounded,
-            color: Color(0xFF28747A),
-            size: 26,
-          ),
-        ),
-        const SizedBox(height: 9),
         Text(
           'Create account',
           style: GoogleFonts.plusJakartaSans(
@@ -163,7 +148,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
               },
             ),
             const SizedBox(height: 12),
-
             _label('Email address'),
             const SizedBox(height: 5),
             TextFormField(
@@ -186,7 +170,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
               },
             ),
             const SizedBox(height: 12),
-
             _label('Password'),
             const SizedBox(height: 5),
             TextFormField(
@@ -218,7 +201,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
               },
             ),
             const SizedBox(height: 12),
-
             _label('Confirm password'),
             const SizedBox(height: 5),
             TextFormField(
@@ -230,9 +212,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 hint: 'Repeat your password',
                 icon: Icons.lock_reset_rounded,
                 suffix: IconButton(
-                  tooltip: _hideConfirmPassword
-                      ? 'Show password'
-                      : 'Hide password',
+                  tooltip:
+                      _hideConfirmPassword ? 'Show password' : 'Hide password',
                   onPressed: () {
                     setState(() {
                       _hideConfirmPassword = !_hideConfirmPassword;
@@ -259,15 +240,12 @@ class _RegisterScreenState extends State<RegisterScreen> {
               onFieldSubmitted: (_) => _createAccount(),
             ),
             const SizedBox(height: 14),
-
             _label('Account Intent'),
             const SizedBox(height: 5),
             _buildAccountTypePicker(),
             const SizedBox(height: 12),
-
             _buildTermsCheckbox(),
             const SizedBox(height: 14),
-
             SizedBox(
               width: double.infinity,
               height: 42,
@@ -442,45 +420,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
           ),
         ),
       ],
-    );
-  }
-
-  Widget _buildBenefits() {
-    return Row(
-      children: [
-        _benefitChip(Icons.recycling_rounded, 'Reuse fashion'),
-        const SizedBox(width: 8),
-        _benefitChip(Icons.verified_user_outlined, 'Secure account'),
-      ],
-    );
-  }
-
-  Widget _benefitChip(IconData icon, String text) {
-    return Expanded(
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
-        decoration: BoxDecoration(
-          color: const Color(0xFFEFEDFA),
-          borderRadius: BorderRadius.circular(10),
-        ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(icon, size: 15, color: _green),
-            const SizedBox(width: 5),
-            Flexible(
-              child: Text(
-                text,
-                overflow: TextOverflow.ellipsis,
-                style: GoogleFonts.plusJakartaSans(
-                  fontSize: 10,
-                  color: _muted,
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
     );
   }
 
