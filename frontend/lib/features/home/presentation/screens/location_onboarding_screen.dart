@@ -17,25 +17,25 @@ const _green = Color(0xFF065F0B);
 class LocationOnboardingScreen extends StatelessWidget {
   const LocationOnboardingScreen({super.key});
 
-  Future<void> _onAllowLocation(BuildContext context) async {
-    final serviceEnabled = await Geolocator.isLocationServiceEnabled();
-    if (!serviceEnabled && context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Location services are disabled. Continuing without location.'),
-        ),
-      );
-    } else {
+  void _onAllowLocation(BuildContext context) {
+    Navigator.of(context)
+        .pushReplacement(MaterialPageRoute(builder: (_) => const HomeScreen()));
+
+    // Let the home screen render before the browser asks for location access.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _requestLocationPermission();
+    });
+  }
+
+  Future<void> _requestLocationPermission() async {
+    try {
       final permission = await Geolocator.checkPermission();
       if (permission == LocationPermission.denied) {
         await Geolocator.requestPermission();
       }
+    } catch (_) {
+      // Continue without location when the platform does not support it.
     }
-
-    if (!context.mounted) return;
-    Navigator.of(context).pushReplacement(
-      MaterialPageRoute(builder: (_) => const HomeScreen()),
-    );
   }
 
   @override
@@ -87,8 +87,7 @@ class LocationOnboardingScreen extends StatelessWidget {
                         const _FeatureCard(
                           icon: Icons.location_on_outlined,
                           title: 'Neighborhood Sellers',
-                          subtitle:
-                              'Connect with vetted curators within walking distance',
+                          subtitle: 'Connect with vetted curators within walking distance',
                         ),
                         const SizedBox(height: 10),
                         const _FeatureCard(
@@ -101,8 +100,7 @@ class LocationOnboardingScreen extends StatelessWidget {
                         const _FeatureCard(
                           icon: Icons.bolt_outlined,
                           title: 'Real-time Deal Alerts',
-                          subtitle:
-                              'Instant notifications when rare archive pieces arrive',
+                          subtitle: 'Instant notifications when rare archive pieces arrive',
                         ),
                       ],
                     ),
@@ -199,8 +197,11 @@ class _TopBar extends StatelessWidget {
               color: _darkTeal,
               shape: BoxShape.circle,
             ),
-            child: const Icon(Icons.person_rounded,
-                size: 18, color: Color(0xFFE0FFF8)),
+            child: const Icon(
+              Icons.person_rounded,
+              size: 18,
+              color: Color(0xFFE0FFF8),
+            ),
           ),
         ],
       ),

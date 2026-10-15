@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
+import '../../../home/presentation/screens/home_screen.dart';
+
 const _bg = Color(0xFFFBF9FF);
 const _surface = Colors.white;
 const _ink = Color(0xFF111827);
@@ -75,6 +77,11 @@ class _MyListingsScreenState extends State<MyListingsScreen> {
         ),
         actions: [
           IconButton(
+            tooltip: 'Home',
+            onPressed: () => _goHome(),
+            icon: const Icon(Icons.home_outlined, color: _ink),
+          ),
+          IconButton(
             onPressed: () => _showMessage('Listing filters are ready.'),
             icon: const Icon(Icons.tune_rounded, color: _darkTeal),
           ),
@@ -92,19 +99,20 @@ class _MyListingsScreenState extends State<MyListingsScreen> {
           const SizedBox(height: 14),
           _buildSnapshot(),
           const SizedBox(height: 16),
-          ..._items.map((item) => Padding(
-                padding: const EdgeInsets.only(bottom: 12),
-                child: _ListingCard(
-                  listing: item,
-                  onEdit: () => _showMessage('Edit listing is ready.'),
-                  onDelete: () => _deleteListing(item),
-                ),
-              )),
+          ..._items.map(
+            (item) => Padding(
+              padding: const EdgeInsets.only(bottom: 12),
+              child: _ListingCard(
+                listing: item,
+                onEdit: () => _showMessage('Edit listing is ready.'),
+                onDelete: () => _deleteListing(item),
+              ),
+            ),
+          ),
         ],
       ),
       floatingActionButton: FloatingActionButton.extended(
-        onPressed: () =>
-            _showMessage('Add listing is ready for your next item.'),
+        onPressed: _createListing,
         backgroundColor: _darkTeal,
         foregroundColor: Colors.white,
         icon: const Icon(Icons.add_rounded),
@@ -188,14 +196,16 @@ class _MyListingsScreenState extends State<MyListingsScreen> {
                 ),
                 Text(
                   '84 views captured this week',
-                  style:
-                      GoogleFonts.plusJakartaSans(fontSize: 12, color: _muted),
+                  style: GoogleFonts.plusJakartaSans(
+                    fontSize: 12,
+                    color: _muted,
+                  ),
                 ),
               ],
             ),
           ),
           ElevatedButton.icon(
-            onPressed: () => _showMessage('New listing form is ready.'),
+            onPressed: _createListing,
             icon: const Icon(Icons.add_rounded, size: 18),
             label: const Text('Drop'),
             style: ElevatedButton.styleFrom(
@@ -217,9 +227,97 @@ class _MyListingsScreenState extends State<MyListingsScreen> {
     _showMessage('${listing.name} removed from your listings.');
   }
 
+  Future<void> _createListing() async {
+    final titleController = TextEditingController();
+    final priceController = TextEditingController();
+    final formKey = GlobalKey<FormState>();
+    final shouldSave = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('New listing'),
+        content: Form(
+          key: formKey,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextFormField(
+                controller: titleController,
+                autofocus: true,
+                decoration: const InputDecoration(labelText: 'Item name'),
+                validator: (value) => value == null || value.trim().isEmpty
+                    ? 'Enter an item name'
+                    : null,
+              ),
+              TextFormField(
+                controller: priceController,
+                keyboardType: TextInputType.number,
+                decoration: const InputDecoration(labelText: 'Price (IDR)'),
+                validator: (value) {
+                  final price = int.tryParse(value?.replaceAll('.', '') ?? '');
+                  return price == null || price <= 0
+                      ? 'Enter a valid price'
+                      : null;
+                },
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () {
+              if (formKey.currentState?.validate() ?? false) {
+                Navigator.pop(dialogContext, true);
+              }
+            },
+            child: const Text('Add item'),
+          ),
+        ],
+      ),
+    );
+
+    if (shouldSave == true && mounted) {
+      final price = int.parse(priceController.text.replaceAll('.', ''));
+      setState(() {
+        _selectedTab = 0;
+        _items.insert(
+          0,
+          _Listing(
+            category: 'NEW ARRIVAL',
+            name: titleController.text.trim(),
+            detail: 'Preloved item • Condition not graded',
+            price: 'Rp ${price.toString()}',
+            views: '0',
+            age: 'Listed just now',
+            color: const Color(0xFFD9E8EA),
+            icon: Icons.checkroom_rounded,
+            grade: 'Pending grade',
+          ),
+        );
+      });
+      _showMessage('Listing added to your active items.');
+    }
+    titleController.dispose();
+    priceController.dispose();
+  }
+
   void _showMessage(String message) {
     ScaffoldMessenger.of(context)
         .showSnackBar(SnackBar(content: Text(message)));
+  }
+
+  void _goHome() {
+    final navigator = Navigator.of(context);
+    if (navigator.canPop()) {
+      navigator.popUntil((route) => route.isFirst);
+    } else {
+      navigator.pushReplacement(
+        MaterialPageRoute(builder: (_) => const HomeScreen()),
+      );
+    }
   }
 }
 
@@ -312,8 +410,11 @@ class _ListingCard extends StatelessWidget {
                             ),
                           ),
                           const Spacer(),
-                          const Icon(Icons.visibility_outlined,
-                              size: 15, color: _muted),
+                          const Icon(
+                            Icons.visibility_outlined,
+                            size: 15,
+                            color: _muted,
+                          ),
                           const SizedBox(width: 3),
                           Text(listing.views, style: _captionStyle()),
                         ],
@@ -346,8 +447,10 @@ class _ListingCard extends StatelessWidget {
                 ),
                 IconButton(
                   onPressed: onDelete,
-                  icon: const Icon(Icons.delete_outline_rounded,
-                      color: Color(0xFFB91C1C)),
+                  icon: const Icon(
+                    Icons.delete_outline_rounded,
+                    color: Color(0xFFB91C1C),
+                  ),
                 ),
               ],
             ),

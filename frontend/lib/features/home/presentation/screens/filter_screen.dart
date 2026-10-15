@@ -88,10 +88,16 @@ class _FilterScreenState extends State<FilterScreen> {
             height: 50,
             width: double.infinity,
             child: ElevatedButton.icon(
-              onPressed: () => Navigator.of(context).pop(FilterResult(
-                radius: _radius,
-                category: _category,
-              )),
+              onPressed: () => Navigator.of(context).pop(
+                FilterResult(
+                  radius: _radius,
+                  category: _category,
+                  minPrice: _price.start,
+                  maxPrice: _price.end,
+                  condition: _condition,
+                  query: _searchController.text.trim(),
+                ),
+              ),
               icon: const Icon(Icons.check_rounded, size: 18),
               label: Text(
                 'Show ${_category == 'All' ? '46' : '18'} Results',
@@ -271,8 +277,10 @@ class _FilterScreenState extends State<FilterScreen> {
           SwitchListTile.adaptive(
             contentPadding: EdgeInsets.zero,
             title: Text('Local pickup only', style: _titleStyle()),
-            subtitle:
-                Text('Avoid courier transit footprint', style: _bodyStyle()),
+            subtitle: Text(
+              'Avoid courier transit footprint',
+              style: _bodyStyle(),
+            ),
             value: _localPickup,
             activeTrackColor: _darkTeal,
             onChanged: (value) => setState(() => _localPickup = value),
@@ -365,10 +373,10 @@ class _FilterScreenState extends State<FilterScreen> {
   }
 
   TextStyle _titleStyle() => GoogleFonts.plusJakartaSans(
-        fontSize: 14,
-        fontWeight: FontWeight.w700,
-        color: _ink,
-      );
+    fontSize: 14,
+    fontWeight: FontWeight.w700,
+    color: _ink,
+  );
 
   TextStyle _bodyStyle() =>
       GoogleFonts.plusJakartaSans(fontSize: 12, color: _muted);
@@ -379,9 +387,9 @@ class _FilterScreenState extends State<FilterScreen> {
   Widget _caption(String text) => Text(text, style: _captionStyle());
 
   InputBorder _border({Color color = Colors.transparent}) => OutlineInputBorder(
-        borderRadius: BorderRadius.circular(14),
-        borderSide: BorderSide(color: color),
-      );
+    borderRadius: BorderRadius.circular(14),
+    borderSide: BorderSide(color: color),
+  );
 
   void _reset() {
     setState(() {
@@ -396,8 +404,19 @@ class _FilterScreenState extends State<FilterScreen> {
 }
 
 class FilterResult {
-  const FilterResult({required this.radius, required this.category});
+  const FilterResult({
+    required this.radius,
+    required this.category,
+    required this.minPrice,
+    required this.maxPrice,
+    required this.condition,
+    required this.query,
+  });
 
   final double radius;
   final String category;
+  final double minPrice;
+  final double maxPrice;
+  final String condition;
+  final String query;
 }

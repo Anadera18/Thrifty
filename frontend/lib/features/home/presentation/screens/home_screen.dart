@@ -23,9 +23,12 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   final _searchController = TextEditingController();
+  final List<_Product> _cart = [];
   int _selectedNav = 0;
   double _radius = 5;
   String _activeCategory = 'All';
+  RangeValues _priceRange = const RangeValues(0, 150000);
+  String _condition = 'A';
 
   @override
   void dispose() {
@@ -60,8 +63,12 @@ class _HomeScreenState extends State<HomeScreen> {
               padding: const EdgeInsets.symmetric(horizontal: 18),
               sliver: SliverGrid(
                 delegate: SliverChildBuilderDelegate(
-                  (context, index) => _ProductCard(product: _products[index]),
-                  childCount: _products.length,
+                  (context, index) => _ProductCard(
+                    product: _visibleProducts[index],
+                    inCart: _cart.contains(_visibleProducts[index]),
+                    onAddToCart: () => _addToCart(_visibleProducts[index]),
+                  ),
+                  childCount: _visibleProducts.length,
                 ),
                 gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
                   crossAxisCount: 2,
@@ -71,12 +78,28 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
               ),
             ),
+            if (_visibleProducts.isEmpty)
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsets.all(32),
+                  child: Center(
+                    child: Text(
+                      'No items match these filters.',
+                      style: GoogleFonts.plusJakartaSans(
+                        fontSize: 13,
+                        color: _muted,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
             const SliverToBoxAdapter(child: SizedBox(height: 28)),
           ],
         ),
       ),
       floatingActionButton: FloatingActionButton(
-        onPressed: () => _showLocalMessage('Add listing is ready for your next item.'),
+        onPressed: () =>
+            _showLocalMessage('Add listing is ready for your next item.'),
         backgroundColor: _darkTeal,
         foregroundColor: Colors.white,
         elevation: 3,
@@ -117,11 +140,57 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
         _roundIcon(Icons.notifications_none_rounded, hasDot: true),
         const SizedBox(width: 8),
+        _cartButton(),
+        const SizedBox(width: 8),
         _roundIcon(
           Icons.person_outline_rounded,
           onTap: () => _openProfile(context),
         ),
       ],
+    );
+  }
+
+  Widget _cartButton() {
+    return InkWell(
+      onTap: _openCart,
+      borderRadius: BorderRadius.circular(24),
+      child: SizedBox(
+        width: 42,
+        height: 42,
+        child: Stack(
+          clipBehavior: Clip.none,
+          children: [
+            const Center(
+              child: Icon(Icons.shopping_cart_outlined, color: _darkTeal),
+            ),
+            if (_cart.isNotEmpty)
+              Positioned(
+                right: 0,
+                top: 0,
+                child: Container(
+                  constraints: const BoxConstraints(
+                    minWidth: 18,
+                    minHeight: 18,
+                  ),
+                  padding: const EdgeInsets.symmetric(horizontal: 4),
+                  alignment: Alignment.center,
+                  decoration: const BoxDecoration(
+                    color: Color(0xFFDC2626),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Text(
+                    '${_cart.length}',
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 10,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+              ),
+          ],
+        ),
+      ),
     );
   }
 
@@ -172,6 +241,7 @@ class _HomeScreenState extends State<HomeScreen> {
         Expanded(
           child: TextField(
             controller: _searchController,
+            onChanged: (_) => setState(() {}),
             style: GoogleFonts.plusJakartaSans(fontSize: 13, color: _ink),
             decoration: InputDecoration(
               hintText: 'Search preloved items...',
@@ -191,25 +261,16 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
         const SizedBox(width: 10),
         InkWell(
-          onTap: () async {
-            final result = await Navigator.of(context).push<FilterResult>(
-              MaterialPageRoute(builder: (_) => const FilterScreen()),
-            );
-            if (!mounted || result == null) return;
-            setState(() {
-              _radius = result.radius;
-              _activeCategory = result.category;
-            });
-          },
+          onTap: () => _openFilters(context),
           borderRadius: BorderRadius.circular(14),
           child: Container(
-          width: 48,
-          height: 48,
-          decoration: BoxDecoration(
-            color: _darkTeal,
-            borderRadius: BorderRadius.circular(14),
-          ),
-          child: const Icon(Icons.tune_rounded, color: Colors.white),
+            width: 48,
+            height: 48,
+            decoration: BoxDecoration(
+              color: _darkTeal,
+              borderRadius: BorderRadius.circular(14),
+            ),
+            child: const Icon(Icons.tune_rounded, color: Colors.white),
           ),
         ),
       ],
@@ -244,7 +305,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
               ),
               const SizedBox(width: 8),
-              _softPill('Within 5 km', _cyanSoft),
+              _softPill('Within ${_radius.round()} km', _cyanSoft),
               const Spacer(),
               Text(
                 'Walking & transit',
@@ -265,9 +326,9 @@ class _HomeScreenState extends State<HomeScreen> {
               trackHeight: 4,
             ),
             child: Slider(
-              value: _radius.clamp(1, 15),
+              value: _radius.clamp(1, 10),
               min: 1,
-              max: 15,
+              max: 10,
               onChanged: (value) => setState(() => _radius = value),
             ),
           ),
@@ -276,7 +337,7 @@ class _HomeScreenState extends State<HomeScreen> {
             children: [
               _caption('1 km'),
               _caption('5 km (Default)'),
-              _caption('15 km'),
+              _caption('10 km'),
             ],
           ),
         ],
@@ -322,7 +383,7 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
         const SizedBox(width: 6),
         Text(
-          '${_activeCategory == 'All' ? _products.length : 2} items nearby',
+          '${_visibleProducts.length} items nearby',
           style: GoogleFonts.plusJakartaSans(fontSize: 11, color: _muted),
         ),
         const Spacer(),
@@ -394,34 +455,132 @@ class _HomeScreenState extends State<HomeScreen> {
 
   void _onTapNav(BuildContext context, int index) {
     setState(() => _selectedNav = index);
-    if (index == 3) {
+    if (index == 1) {
+      _openFilters(context);
+    } else if (index == 3) {
       _openProfile(context);
     } else if (index == 2) {
       _openListings(context);
     }
   }
 
+  Future<void> _openFilters(BuildContext context) async {
+    final result = await Navigator.of(context).push<FilterResult>(
+      MaterialPageRoute(builder: (_) => const FilterScreen()),
+    );
+    if (!mounted) return;
+    setState(() {
+      _selectedNav = 0;
+      if (result != null) {
+        _radius = result.radius;
+        _activeCategory = result.category;
+        _priceRange = RangeValues(result.minPrice, result.maxPrice);
+        _condition = result.condition;
+        _searchController.text = result.query;
+      }
+    });
+  }
+
+  List<_Product> get _visibleProducts {
+    final query = _searchController.text.trim().toLowerCase();
+    return _products.where((product) {
+      final matchesQuery =
+          query.isEmpty ||
+          product.name.toLowerCase().contains(query) ||
+          product.brand.toLowerCase().contains(query);
+      final matchesCategory =
+          _activeCategory == 'All' ||
+          switch (_activeCategory) {
+            'Shirt' => product.name.toLowerCase().contains('shirt'),
+            'T-Shirt' => product.name.toLowerCase().contains('tee'),
+            'Pants' => product.name.toLowerCase().contains('pants'),
+            'Jacket' => product.name.toLowerCase().contains('jacket'),
+            _ => true,
+          };
+      final price =
+          int.tryParse(product.price.replaceAll(RegExp(r'[^0-9]'), '')) ?? 0;
+      final distance = _distanceInKm(product.distance);
+      final grade = product.grade.toUpperCase();
+      final matchesCondition = _condition == 'A'
+          ? grade.startsWith('GRADE A')
+          : grade.startsWith('GRADE $_condition');
+      return matchesQuery &&
+          matchesCategory &&
+          price >= _priceRange.start &&
+          price <= _priceRange.end &&
+          distance <= _radius &&
+          matchesCondition;
+    }).toList();
+  }
+
+  double _distanceInKm(String value) {
+    final normalized = value.trim().toLowerCase();
+    if (normalized.endsWith('km')) {
+      return double.tryParse(
+            normalized.substring(0, normalized.length - 2).trim(),
+          ) ??
+          double.infinity;
+    }
+    if (normalized.endsWith('m')) {
+      final meters = double.tryParse(
+        normalized.substring(0, normalized.length - 1).trim(),
+      );
+      return meters == null ? double.infinity : meters / 1000;
+    }
+    return double.tryParse(normalized) ?? double.infinity;
+  }
+
   void _openProfile(BuildContext context) {
-    Navigator.of(
-      context,
-    ).push(MaterialPageRoute(builder: (_) => const ProfileScreen()));
+    Navigator.of(context)
+        .push(MaterialPageRoute(builder: (_) => const ProfileScreen()));
   }
 
   void _openListings(BuildContext context) {
-    Navigator.of(
-      context,
-    ).push(MaterialPageRoute(builder: (_) => const MyListingsScreen()));
+    Navigator.of(context)
+        .push(MaterialPageRoute(builder: (_) => const MyListingsScreen()));
   }
 
   void _showLocalMessage(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+    ScaffoldMessenger.of(context)
+        .showSnackBar(SnackBar(content: Text(message)));
+  }
+
+  void _addToCart(_Product product) {
+    if (_cart.contains(product)) {
+      _showLocalMessage('This item is already in your cart.');
+      return;
+    }
+    setState(() => _cart.add(product));
+    _showLocalMessage('${product.name} added to your cart.');
+  }
+
+  Future<void> _openCart() async {
+    await Navigator.of(context).push<void>(
+      MaterialPageRoute(
+        builder: (_) => _CartScreen(
+          items: _cart,
+          onRemove: (product) => setState(() => _cart.remove(product)),
+          onCheckout: () {
+            setState(_cart.clear);
+            Navigator.of(context).pop();
+            _showLocalMessage('Checkout complete (demo).');
+          },
+        ),
+      ),
+    );
   }
 }
 
 class _ProductCard extends StatelessWidget {
-  const _ProductCard({required this.product});
+  const _ProductCard({
+    required this.product,
+    required this.onAddToCart,
+    required this.inCart,
+  });
 
   final _Product product;
+  final VoidCallback onAddToCart;
+  final bool inCart;
 
   @override
   Widget build(BuildContext context) {
@@ -442,17 +601,9 @@ class _ProductCard extends StatelessWidget {
               children: [
                 Container(color: product.placeholderColor),
                 Center(
-                  child: Icon(
-                    product.icon,
-                    size: 44,
-                    color: product.iconColor,
-                  ),
+                  child: Icon(product.icon, size: 44, color: product.iconColor),
                 ),
-                Positioned(
-                  top: 9,
-                  left: 9,
-                  child: _gradePill(product.grade),
-                ),
+                Positioned(top: 9, left: 9, child: _gradePill(product.grade)),
                 const Positioned(
                   top: 7,
                   right: 7,
@@ -470,6 +621,26 @@ class _ProductCard extends StatelessWidget {
                   bottom: 8,
                   left: 9,
                   child: _distancePill(product.distance),
+                ),
+                Positioned(
+                  bottom: 7,
+                  right: 7,
+                  child: Material(
+                    color: Colors.white,
+                    shape: const CircleBorder(),
+                    child: IconButton(
+                      tooltip: inCart ? 'Already in cart' : 'Add to cart',
+                      onPressed: onAddToCart,
+                      visualDensity: VisualDensity.compact,
+                      icon: Icon(
+                        inCart
+                            ? Icons.shopping_cart_rounded
+                            : Icons.add_shopping_cart_rounded,
+                        size: 18,
+                        color: _darkTeal,
+                      ),
+                    ),
+                  ),
                 ),
               ],
             ),
@@ -588,6 +759,191 @@ class _ProductCard extends StatelessWidget {
           color: Colors.white,
         ),
       ),
+    );
+  }
+}
+
+class _CartScreen extends StatefulWidget {
+  const _CartScreen({
+    required this.items,
+    required this.onRemove,
+    required this.onCheckout,
+  });
+
+  final List<_Product> items;
+  final ValueChanged<_Product> onRemove;
+  final VoidCallback onCheckout;
+
+  @override
+  State<_CartScreen> createState() => _CartScreenState();
+}
+
+class _CartScreenState extends State<_CartScreen> {
+  late final List<_Product> _items = List.of(widget.items);
+
+  int get _total => _items.fold(
+    0,
+    (sum, item) =>
+        sum + (int.tryParse(item.price.replaceAll(RegExp(r'[^0-9]'), '')) ?? 0),
+  );
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: _background,
+      appBar: AppBar(
+        backgroundColor: _background,
+        title: Text(
+          'My cart (${_items.length})',
+          style: GoogleFonts.plusJakartaSans(
+            fontSize: 20,
+            fontWeight: FontWeight.w800,
+            color: _ink,
+          ),
+        ),
+      ),
+      body: _items.isEmpty
+          ? Center(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(
+                    Icons.shopping_cart_outlined,
+                    size: 52,
+                    color: _muted,
+                  ),
+                  const SizedBox(height: 12),
+                  Text(
+                    'Your cart is empty',
+                    style: GoogleFonts.plusJakartaSans(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w700,
+                      color: _ink,
+                    ),
+                  ),
+                ],
+              ),
+            )
+          : ListView.separated(
+              padding: const EdgeInsets.all(16),
+              itemCount: _items.length,
+              separatorBuilder: (_, _) => const SizedBox(height: 10),
+              itemBuilder: (context, index) {
+                final item = _items[index];
+                return Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: _surface,
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: _line),
+                  ),
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 58,
+                        height: 58,
+                        decoration: BoxDecoration(
+                          color: item.placeholderColor,
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Icon(item.icon, color: item.iconColor),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              item.name,
+                              style: GoogleFonts.plusJakartaSans(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w700,
+                                color: _ink,
+                              ),
+                            ),
+                            Text(
+                              item.brand,
+                              style: GoogleFonts.plusJakartaSans(
+                                fontSize: 11,
+                                color: _muted,
+                              ),
+                            ),
+                            Text(
+                              item.price,
+                              style: GoogleFonts.plusJakartaSans(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w800,
+                                color: _darkTeal,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      IconButton(
+                        tooltip: 'Remove from cart',
+                        onPressed: () {
+                          setState(() => _items.removeAt(index));
+                          widget.onRemove(item);
+                        },
+                        icon: const Icon(
+                          Icons.delete_outline_rounded,
+                          color: Color(0xFFB91C1C),
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              },
+            ),
+      bottomNavigationBar: _items.isEmpty
+          ? null
+          : SafeArea(
+              child: Container(
+                padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+                decoration: const BoxDecoration(
+                  color: _surface,
+                  border: Border(top: BorderSide(color: _line)),
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Row(
+                      children: [
+                        Text(
+                          'Subtotal',
+                          style: GoogleFonts.plusJakartaSans(
+                            fontSize: 14,
+                            color: _muted,
+                          ),
+                        ),
+                        const Spacer(),
+                        Text(
+                          'Rp ${_total.toString()}',
+                          style: GoogleFonts.plusJakartaSans(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w800,
+                            color: _ink,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 10),
+                    SizedBox(
+                      width: double.infinity,
+                      height: 48,
+                      child: ElevatedButton(
+                        onPressed: widget.onCheckout,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: _darkTeal,
+                          foregroundColor: Colors.white,
+                        ),
+                        child: const Text('Checkout'),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
     );
   }
 }

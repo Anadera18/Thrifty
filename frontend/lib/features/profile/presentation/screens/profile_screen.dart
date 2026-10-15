@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../../auth/presentation/screens/login_screen.dart';
+import '../../../home/presentation/screens/home_screen.dart';
 import '../../../my_listings/presentation/screens/my_listings_screen.dart';
 
 const _bg = Color(0xFFFBF9FF);
@@ -24,9 +25,16 @@ class ProfileScreen extends StatelessWidget {
         backgroundColor: _bg,
         elevation: 0,
         leading: IconButton(
-          onPressed: () => Navigator.of(context).maybePop(),
+          onPressed: () => _goHome(context),
           icon: const Icon(Icons.arrow_back_rounded, color: _ink),
         ),
+        actions: [
+          IconButton(
+            tooltip: 'Home',
+            onPressed: () => _goHome(context),
+            icon: const Icon(Icons.home_outlined, color: _ink),
+          ),
+        ],
         title: Text(
           'Profile',
           style: GoogleFonts.plusJakartaSans(
@@ -127,7 +135,9 @@ class ProfileScreen extends StatelessWidget {
               ),
               InkWell(
                 onTap: () => _showMessage(
-                    context, 'Profile editing will be available soon.'),
+                  context,
+                  'Profile editing will be available soon.',
+                ),
                 borderRadius: BorderRadius.circular(24),
                 child: const CircleAvatar(
                   radius: 20,
@@ -164,11 +174,17 @@ class ProfileScreen extends StatelessWidget {
   Widget _buildStatsRow() {
     return Row(
       children: const [
-        Expanded(child: _StatCard(value: '12', label: 'LISTINGS')),
+        Expanded(
+          child: _StatCard(value: '12', label: 'LISTINGS'),
+        ),
         SizedBox(width: 10),
-        Expanded(child: _StatCard(value: '8', label: 'SOLD')),
+        Expanded(
+          child: _StatCard(value: '8', label: 'SOLD'),
+        ),
         SizedBox(width: 10),
-        Expanded(child: _StatCard(value: '5 KM', label: 'RADIUS')),
+        Expanded(
+          child: _StatCard(value: '5 KM', label: 'RADIUS'),
+        ),
       ],
     );
   }
@@ -189,9 +205,9 @@ class ProfileScreen extends StatelessWidget {
             title: 'My listings',
             subtitle: '12 active & archived apparel',
             trailing: '12',
-            onTap: () => Navigator.of(context).push(
-              MaterialPageRoute(builder: (_) => const MyListingsScreen()),
-            ),
+            onTap: () => Navigator.of(
+              context,
+            ).push(MaterialPageRoute(builder: (_) => const MyListingsScreen())),
           ),
           const _MenuDivider(),
           _MenuTile(
@@ -250,8 +266,9 @@ class ProfileScreen extends StatelessWidget {
         style: OutlinedButton.styleFrom(
           side: const BorderSide(color: Color(0xFFF3D4D4)),
           backgroundColor: const Color(0xFFFFF4F4),
-          shape:
-              RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(18),
+          ),
         ),
       ),
     );
@@ -260,6 +277,17 @@ class ProfileScreen extends StatelessWidget {
   void _showMessage(BuildContext context, String message) {
     ScaffoldMessenger.of(context)
         .showSnackBar(SnackBar(content: Text(message)));
+  }
+
+  void _goHome(BuildContext context) {
+    final navigator = Navigator.of(context);
+    if (navigator.canPop()) {
+      navigator.popUntil((route) => route.isFirst);
+    } else {
+      navigator.pushReplacement(
+        MaterialPageRoute(builder: (_) => const HomeScreen()),
+      );
+    }
   }
 }
 
@@ -342,10 +370,7 @@ class _MenuTile extends StatelessWidget {
       ),
       subtitle: Text(
         subtitle,
-        style: GoogleFonts.plusJakartaSans(
-          fontSize: 14,
-          color: _muted,
-        ),
+        style: GoogleFonts.plusJakartaSans(fontSize: 14, color: _muted),
       ),
       trailing: Row(
         mainAxisSize: MainAxisSize.min,
