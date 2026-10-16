@@ -1,467 +1,330 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 
-const Color _green = Color(0xFF006400);
-const Color _background = Color(0xFFF8F9FA);
+const _bg = Color(0xFFFBF9FF);
+const _surface = Colors.white;
+const _ink = Color(0xFF111827);
+const _muted = Color(0xFF5B6270);
+const _teal = Color(0xFF0E3436);
+const _green = Color(0xFF14532D);
+const _line = Color(0xFFE5E3EF);
+const _cyan = Color(0xFFCFF5FA);
 
-class ProductDetailScreen extends StatelessWidget {
-  const ProductDetailScreen({super.key});
+class ProductDetailsData {
+  const ProductDetailsData({
+    required this.name,
+    required this.brand,
+    required this.price,
+    required this.distance,
+    required this.rating,
+    required this.grade,
+    required this.placeholderColor,
+    required this.iconColor,
+    required this.icon,
+  });
+
+  final String name;
+  final String brand;
+  final String price;
+  final String distance;
+  final String rating;
+  final String grade;
+  final Color placeholderColor;
+  final Color iconColor;
+  final IconData icon;
+}
+
+class ProductDetailScreen extends StatefulWidget {
+  const ProductDetailScreen({
+    super.key,
+    this.product = const ProductDetailsData(
+      name: 'Vintage Denim Jacket',
+      brand: 'Thrifty Archive',
+      price: 'Rp 89.000',
+      distance: '1.2 km',
+      rating: '4.9',
+      grade: 'Grade A • Like New',
+      placeholderColor: Color(0xFFD9E8EA),
+      iconColor: Color(0xFF4F7880),
+      icon: Icons.checkroom_rounded,
+    ),
+    this.onAddToCart,
+  });
+
+  final ProductDetailsData product;
+  final VoidCallback? onAddToCart;
+
+  @override
+  State<ProductDetailScreen> createState() => _ProductDetailScreenState();
+}
+
+class _ProductDetailScreenState extends State<ProductDetailScreen> {
+  bool _saved = false;
 
   @override
   Widget build(BuildContext context) {
+    final product = widget.product;
     return Scaffold(
-      backgroundColor: _background,
+      backgroundColor: _bg,
       body: CustomScrollView(
         slivers: [
           SliverAppBar(
-            expandedHeight: 360,
             pinned: true,
-            backgroundColor: Colors.white,
+            expandedHeight: 310,
+            backgroundColor: _bg,
             elevation: 0,
-            leading: IconButton(
-              icon: const Icon(Icons.arrow_back, color: Colors.black87),
-              onPressed: () {
-                if (Navigator.canPop(context)) {
-                  Navigator.pop(context);
-                }
-              },
+            leading: _roundAction(
+              Icons.arrow_back_rounded,
+              () => Navigator.pop(context),
             ),
             actions: [
-              IconButton(
-                icon: const Icon(Icons.share_outlined, color: Colors.black87),
-                onPressed: () {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Fitur berbagi segera hadir')),
-                  );
-                },
+              _roundAction(
+                _saved ? Icons.favorite_rounded : Icons.favorite_border_rounded,
+                () => setState(() => _saved = !_saved),
+                color: _saved ? const Color(0xFFDC2626) : _teal,
               ),
-              IconButton(
-                icon: const Icon(Icons.favorite_border, color: Colors.black87),
-                onPressed: () {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Produk ditambahkan ke favorit')),
-                  );
-                },
-              ),
+              const SizedBox(width: 10),
             ],
             flexibleSpace: FlexibleSpaceBar(
               background: Stack(
                 fit: StackFit.expand,
                 children: [
-                  Image.network(
-                    'https://images.unsplash.com/photo-1543076447-215ad9ba6923?auto=format&fit=crop&q=80&w=1000',
-                    fit: BoxFit.cover,
-                    errorBuilder: (_, __, ___) => const ColoredBox(
-                      color: Color(0xFFE4E7E3),
-                      child: Center(
-                        child: Icon(Icons.checkroom, size: 90, color: _green),
+                  ColoredBox(
+                    color: product.placeholderColor,
+                    child: Center(
+                      child: Icon(
+                        product.icon,
+                        size: 112,
+                        color: product.iconColor,
                       ),
                     ),
                   ),
                   Positioned(
-                    bottom: 16,
-                    left: 16,
+                    left: 18,
+                    bottom: 18,
                     child: _pill(
-                      child: const Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(Icons.verified, size: 14, color: _green),
-                          SizedBox(width: 6),
-                          Text(
-                            'VERIFIED AUTHENTIC',
-                            style: TextStyle(
-                              fontSize: 10,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ],
-                      ),
+                      Icons.verified_rounded,
+                      'CONDITION CHECKED',
+                      _teal,
+                      Colors.white,
                     ),
                   ),
                   Positioned(
-                    bottom: 16,
-                    right: 16,
+                    right: 18,
+                    bottom: 18,
                     child: _pill(
-                      color: Colors.black54,
-                      child: const Text(
-                        '1 / 4',
-                        style: TextStyle(color: Colors.white, fontSize: 12),
-                      ),
+                      Icons.location_on_outlined,
+                      product.distance,
+                      Colors.white,
+                      _teal,
                     ),
                   ),
                 ],
               ),
             ),
           ),
-
           SliverToBoxAdapter(
             child: Padding(
-              padding: const EdgeInsets.all(16),
+              padding: const EdgeInsets.fromLTRB(18, 17, 18, 110),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  Row(
                     children: [
                       Expanded(
                         child: Text(
-                          'OUTERWEAR • DENIM JACKET',
-                          style: TextStyle(
-                            fontSize: 11,
-                            fontWeight: FontWeight.bold,
+                          product.brand.toUpperCase(),
+                          style: GoogleFonts.plusJakartaSans(
+                            fontSize: 10,
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: .7,
+                            color: _teal,
+                          ),
+                        ),
+                      ),
+                      const Icon(Icons.star_rounded, size: 16, color: _green),
+                      const SizedBox(width: 3),
+                      Text(
+                        product.rating,
+                        style: GoogleFonts.plusJakartaSans(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
+                          color: _ink,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 5),
+                  Text(product.name, style: _titleStyle(23)),
+                  const SizedBox(height: 10),
+                  Row(
+                    children: [
+                      Text(
+                        product.price,
+                        style: GoogleFonts.plusJakartaSans(
+                          fontSize: 20,
+                          fontWeight: FontWeight.w800,
+                          color: _ink,
+                        ),
+                      ),
+                      const SizedBox(width: 9),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 9,
+                          vertical: 5,
+                        ),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFE6F3E8),
+                          borderRadius: BorderRadius.circular(999),
+                        ),
+                        child: Text(
+                          'Preloved',
+                          style: GoogleFonts.plusJakartaSans(
+                            fontSize: 10,
+                            fontWeight: FontWeight.w700,
                             color: _green,
                           ),
                         ),
                       ),
-                      Text(
-                        'Listed 2 hours ago',
-                        style: TextStyle(fontSize: 10, color: Colors.grey),
-                      ),
                     ],
                   ),
-                  const SizedBox(height: 8),
-
-                  const Text(
-                    'Vintage Denim Jacket',
-                    style: TextStyle(
-                      fontSize: 23,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.black87,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-
-                  Wrap(
-                    crossAxisAlignment: WrapCrossAlignment.center,
-                    spacing: 10,
-                    runSpacing: 4,
-                    children: [
-                      const Text(
-                        'Rp 89.000',
-                        style: TextStyle(
-                          fontSize: 21,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      const Text(
-                        'Rp 450.000',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: Colors.grey,
-                          decoration: TextDecoration.lineThrough,
-                        ),
-                      ),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 6,
-                          vertical: 3,
-                        ),
-                        decoration: BoxDecoration(
-                          color: Colors.orange.shade50,
-                          borderRadius: BorderRadius.circular(4),
-                        ),
-                        child: const Text(
-                          '80% OFF',
-                          style: TextStyle(
-                            color: Colors.deepOrange,
-                            fontSize: 10,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 18),
-
-                  // AI condition grading
-                  Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: _green.withValues(alpha: 0.05),
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(
-                        color: _green.withValues(alpha: 0.22),
-                      ),
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Wrap(
-                          alignment: WrapAlignment.spaceBetween,
-                          crossAxisAlignment: WrapCrossAlignment.center,
-                          spacing: 8,
-                          runSpacing: 8,
-                          children: [
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 9,
-                                vertical: 5,
-                              ),
-                              decoration: BoxDecoration(
-                                color: _green,
-                                borderRadius: BorderRadius.circular(6),
-                              ),
-                              child: const Text(
-                                'Grade A – Like New',
-                                style: TextStyle(
-                                  color: Colors.white,
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 11,
-                                ),
-                              ),
-                            ),
-                            const Text(
-                              '✨ 92% Match · How grades work',
-                              style: TextStyle(
-                                fontSize: 10,
-                                color: _green,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 10),
-                        const Text(
-                          'Pristine authentic vintage denim with minimal natural fading. Zero structural defects, strong seam integrity, original bronze buttons intact.',
-                          style: TextStyle(fontSize: 12, height: 1.5),
-                        ),
-                        const SizedBox(height: 12),
-                        const Wrap(
-                          spacing: 8,
-                          runSpacing: 8,
-                          children: [
-                            _FeatureChip(label: 'Fabric Integrity: 96%'),
-                            _FeatureChip(label: 'Color Vibrancy: 91%'),
-                            _FeatureChip(label: 'Odor-free certified'),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 24),
-
-                  const _SectionTitle('About this item'),
-                  const SizedBox(height: 8),
-                  const Text(
-                    'Classic boxy-fit trucker denim jacket from the late 90s. Heavyweight rigid cotton denim with authentic honeycombing wear on elbows. Features twin chest flap pockets, side welt hand pockets, and adjustable waist tabs. Carefully hand-washed and ozone-sanitized.',
-                    style: TextStyle(
-                      fontSize: 13,
-                      color: Colors.black54,
+                  const SizedBox(height: 16),
+                  _gradeCard(product.grade),
+                  const SizedBox(height: 17),
+                  _sectionTitle('About this item'),
+                  const SizedBox(height: 7),
+                  Text(
+                    '${product.name} from ${product.brand}. A carefully selected preloved piece with a clear condition grade, ready for its next owner.',
+                    style: GoogleFonts.plusJakartaSans(
+                      fontSize: 12,
                       height: 1.6,
+                      color: _muted,
                     ),
                   ),
                   const SizedBox(height: 16),
-
-                  GridView.count(
-                    crossAxisCount: 2,
-                    shrinkWrap: true,
-                    physics: const NeverScrollableScrollPhysics(),
-                    childAspectRatio: 2.3,
-                    mainAxisSpacing: 8,
-                    crossAxisSpacing: 8,
-                    children: const [
-                      _SpecCard(title: 'BRAND', value: 'Vintage Archive'),
-                      _SpecCard(title: 'ERA', value: 'Late 90s vintage'),
-                      _SpecCard(title: 'SIZE', value: 'L (P2P 58cm, L 64cm)'),
-                      _SpecCard(title: 'MATERIAL', value: '100% Rigid Cotton'),
-                    ],
-                  ),
-                  const SizedBox(height: 24),
-
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      const Flexible(child: _SectionTitle('Seller & Location')),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 8,
-                          vertical: 5,
-                        ),
-                        decoration: BoxDecoration(
-                          color: Colors.blue.shade50,
-                          borderRadius: BorderRadius.circular(5),
-                        ),
-                        child: const Text(
-                          'Fast Responder',
-                          style: TextStyle(
-                            fontSize: 10,
-                            color: Colors.blue,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-
-                  Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: Colors.grey.shade200),
+                  _infoCard([
+                    _infoRow(
+                      Icons.checkroom_outlined,
+                      'Condition',
+                      product.grade.replaceFirst('Grade ', ''),
                     ),
-                    child: Column(
+                    const Divider(height: 18, color: _line),
+                    _infoRow(
+                      Icons.local_shipping_outlined,
+                      'Delivery',
+                      'Local pickup available',
+                    ),
+                    const Divider(height: 18, color: _line),
+                    _infoRow(
+                      Icons.location_on_outlined,
+                      'Distance',
+                      product.distance,
+                    ),
+                  ]),
+                  const SizedBox(height: 16),
+                  _sellerCard(),
+                  const SizedBox(height: 16),
+                  Container(
+                    padding: const EdgeInsets.all(13),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFFFF8E8),
+                      borderRadius: BorderRadius.circular(15),
+                      border: Border.all(color: const Color(0xFFF4E6C3)),
+                    ),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Row(
-                          children: [
-                            const CircleAvatar(
-                              radius: 24,
-                              backgroundColor: Color(0xFFE0E7E1),
-                              child: Icon(Icons.person, color: _green),
-                            ),
-                            const SizedBox(width: 12),
-                            const Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    'Rian Vintage Archives',
-                                    style: TextStyle(
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: 13,
-                                    ),
-                                  ),
-                                  SizedBox(height: 5),
-                                  Text(
-                                    '⭐ 4.9 · 128 reviews · Verified Curator',
-                                    style: TextStyle(
-                                      fontSize: 10,
-                                      color: Colors.grey,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                            const Icon(Icons.verified, color: Colors.blue, size: 18),
-                          ],
+                        const Icon(
+                          Icons.shield_outlined,
+                          color: Color(0xFF9A6700),
+                          size: 19,
                         ),
-                        const SizedBox(height: 14),
-                        Container(
-                          width: double.infinity,
-                          height: 110,
-                          decoration: BoxDecoration(
-                            color: Colors.green.shade50,
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: Stack(
-                            children: [
-                              const Center(
-                                child: Icon(
-                                  Icons.location_on,
-                                  color: _green,
-                                  size: 38,
-                                ),
-                              ),
-                              Positioned(
-                                top: 8,
-                                left: 8,
-                                child: _pill(
-                                  child: const Text(
-                                    '2.3 km away',
-                                    style: TextStyle(fontSize: 10),
-                                  ),
-                                ),
-                              ),
-                              Positioned(
-                                bottom: 8,
-                                left: 8,
-                                right: 8,
-                                child: _pill(
-                                  child: const Text(
-                                    'Local pickup available · Dago',
-                                    style: TextStyle(fontSize: 10),
-                                  ),
-                                ),
-                              ),
-                            ],
+                        const SizedBox(width: 9),
+                        Expanded(
+                          child: Text(
+                            'Keep your chat and payment on Thrifty. Meet in a public place and check the item before completing your exchange.',
+                            style: GoogleFonts.plusJakartaSans(
+                              fontSize: 10,
+                              height: 1.5,
+                              color: const Color(0xFF775719),
+                            ),
                           ),
                         ),
                       ],
                     ),
                   ),
-                  const SizedBox(height: 110),
                 ],
               ),
             ),
           ),
         ],
       ),
-
-      // Sticky action bar
-      bottomSheet: SafeArea(
+      bottomNavigationBar: SafeArea(
         top: false,
         child: Container(
-          padding: const EdgeInsets.fromLTRB(12, 8, 12, 8),
+          padding: const EdgeInsets.fromLTRB(18, 11, 18, 12),
           decoration: BoxDecoration(
-            color: Colors.white,
-            boxShadow: [
+            color: _surface,
+            border: const Border(top: BorderSide(color: _line)),
+            boxShadow: const [
               BoxShadow(
-                color: Colors.black.withValues(alpha: 0.06),
-                blurRadius: 10,
-                offset: const Offset(0, -4),
+                color: Color(0x0D000000),
+                blurRadius: 12,
+                offset: Offset(0, -3),
               ),
             ],
           ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
+          child: Row(
             children: [
-              Row(
-                children: [
-                  IconButton(
-                    tooltip: 'Favorit',
-                    icon: const Icon(Icons.favorite_border),
-                    onPressed: () {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('Produk ditambahkan ke favorit'),
-                        ),
-                      );
-                    },
-                  ),
-                  IconButton(
-                    tooltip: 'Penawaran',
-                    icon: const Icon(Icons.local_offer_outlined),
-                    onPressed: () {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('Fitur penawaran segera hadir'),
-                        ),
-                      );
-                    },
-                  ),
-                  const SizedBox(width: 6),
-                  Expanded(
-                    child: ElevatedButton.icon(
-                      onPressed: () {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text('Fitur Contact Seller segera hadir'),
-                          ),
-                        );
-                      },
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: _green,
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(vertical: 13),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(8),
-                        ),
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed:
+                      widget.onAddToCart ??
+                      () => ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('Added to cart (demo).')),
                       ),
-                      icon: const Icon(Icons.chat_bubble_outline, size: 19),
-                      label: const Text(
-                        'Contact Seller',
-                        style: TextStyle(fontWeight: FontWeight.bold),
-                      ),
+                  icon: const Icon(Icons.add_shopping_cart_rounded, size: 18),
+                  label: Text(
+                    'Add to cart',
+                    style: GoogleFonts.plusJakartaSans(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w800,
                     ),
                   ),
-                ],
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: _teal,
+                    side: const BorderSide(color: _teal),
+                    minimumSize: const Size(0, 48),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                  ),
+                ),
               ),
-              const SizedBox(height: 4),
-              const Text(
-                '🛡 Buyer Protection Guarantee & Local Handover',
-                textAlign: TextAlign.center,
-                style: TextStyle(fontSize: 9, color: Colors.grey),
+              const SizedBox(width: 10),
+              Expanded(
+                child: FilledButton(
+                  onPressed: () => ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Chat with seller is coming soon.'),
+                    ),
+                  ),
+                  style: FilledButton.styleFrom(
+                    backgroundColor: _teal,
+                    foregroundColor: Colors.white,
+                    minimumSize: const Size(0, 48),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                  ),
+                  child: Text(
+                    'Chat with seller',
+                    style: GoogleFonts.plusJakartaSans(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ),
               ),
             ],
           ),
@@ -469,108 +332,191 @@ class ProductDetailScreen extends StatelessWidget {
       ),
     );
   }
-}
 
-Widget _pill({required Widget child, Color color = Colors.white}) {
-  return Container(
-    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+  Widget _roundAction(
+    IconData icon,
+    VoidCallback onTap, {
+    Color color = _teal,
+  }) => Padding(
+    padding: const EdgeInsets.only(left: 10),
+    child: Material(
+      color: Colors.white.withValues(alpha: .95),
+      shape: const CircleBorder(),
+      child: IconButton(
+        onPressed: onTap,
+        icon: Icon(icon, color: color, size: 20),
+        visualDensity: VisualDensity.compact,
+      ),
+    ),
+  );
+
+  Widget _pill(
+    IconData icon,
+    String label,
+    Color background,
+    Color foreground,
+  ) => Container(
+    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
     decoration: BoxDecoration(
-      color: color,
-      borderRadius: BorderRadius.circular(20),
-      boxShadow: [
-        if (color == Colors.white)
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.08),
-            blurRadius: 4,
+      color: background,
+      borderRadius: BorderRadius.circular(999),
+    ),
+    child: Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(icon, size: 13, color: foreground),
+        const SizedBox(width: 5),
+        Text(
+          label,
+          style: GoogleFonts.plusJakartaSans(
+            fontSize: 9,
+            fontWeight: FontWeight.w800,
+            color: foreground,
           ),
+        ),
       ],
     ),
-    child: child,
+  );
+
+  Widget _gradeCard(String grade) => Container(
+    padding: const EdgeInsets.all(14),
+    decoration: BoxDecoration(
+      color: _cyan.withValues(alpha: .38),
+      borderRadius: BorderRadius.circular(16),
+      border: Border.all(color: _cyan),
+    ),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            const Icon(Icons.auto_awesome_rounded, color: _teal, size: 18),
+            const SizedBox(width: 7),
+            Expanded(
+              child: Text(
+                'Thrifty condition grade',
+                style: GoogleFonts.plusJakartaSans(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w800,
+                  color: _teal,
+                ),
+              ),
+            ),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+              decoration: BoxDecoration(
+                color: _teal,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Text(
+                grade,
+                style: GoogleFonts.plusJakartaSans(
+                  fontSize: 9,
+                  fontWeight: FontWeight.w800,
+                  color: Colors.white,
+                ),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        Text(
+          'Review the photos and description with the seller at pickup to confirm the item matches its listing.',
+          style: GoogleFonts.plusJakartaSans(
+            fontSize: 10,
+            height: 1.5,
+            color: _muted,
+          ),
+        ),
+      ],
+    ),
+  );
+
+  Widget _sectionTitle(String title) => Text(
+    title,
+    style: GoogleFonts.plusJakartaSans(
+      fontSize: 15,
+      fontWeight: FontWeight.w800,
+      color: _ink,
+    ),
+  );
+
+  Widget _infoCard(List<Widget> children) => Container(
+    padding: const EdgeInsets.all(13),
+    decoration: BoxDecoration(
+      color: _surface,
+      borderRadius: BorderRadius.circular(16),
+      border: Border.all(color: _line),
+    ),
+    child: Column(children: children),
+  );
+
+  Widget _infoRow(IconData icon, String label, String value) => Row(
+    children: [
+      Icon(icon, size: 17, color: _teal),
+      const SizedBox(width: 9),
+      Text(
+        label,
+        style: GoogleFonts.plusJakartaSans(fontSize: 11, color: _muted),
+      ),
+      const Spacer(),
+      Text(
+        value,
+        style: GoogleFonts.plusJakartaSans(
+          fontSize: 11,
+          fontWeight: FontWeight.w700,
+          color: _ink,
+        ),
+      ),
+    ],
+  );
+
+  Widget _sellerCard() => Container(
+    padding: const EdgeInsets.all(13),
+    decoration: BoxDecoration(
+      color: _surface,
+      borderRadius: BorderRadius.circular(16),
+      border: Border.all(color: _line),
+    ),
+    child: Row(
+      children: [
+        const CircleAvatar(
+          radius: 21,
+          backgroundColor: _teal,
+          child: Text(
+            'DP',
+            style: TextStyle(color: Colors.white, fontWeight: FontWeight.w800),
+          ),
+        ),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Dinda Putri',
+                style: GoogleFonts.plusJakartaSans(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w800,
+                  color: _ink,
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                'Trusted local seller • 4.9 rating',
+                style: GoogleFonts.plusJakartaSans(fontSize: 10, color: _muted),
+              ),
+            ],
+          ),
+        ),
+        const Icon(Icons.verified_rounded, color: _green, size: 19),
+      ],
+    ),
   );
 }
 
-class _SectionTitle extends StatelessWidget {
-  final String title;
-
-  const _SectionTitle(this.title);
-
-  @override
-  Widget build(BuildContext context) {
-    return Text(
-      title,
-      style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-    );
-  }
-}
-
-class _FeatureChip extends StatelessWidget {
-  final String label;
-
-  const _FeatureChip({required this.label});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(6),
-        border: Border.all(color: _green.withValues(alpha: 0.25)),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          const Icon(Icons.check_circle, size: 12, color: _green),
-          const SizedBox(width: 4),
-          Text(
-            label,
-            style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w500),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _SpecCard extends StatelessWidget {
-  final String title;
-  final String value;
-
-  const _SpecCard({required this.title, required this.value});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(8),
-      decoration: BoxDecoration(
-        color: Colors.grey.shade100,
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Text(
-            title,
-            style: const TextStyle(
-              fontSize: 9,
-              color: Colors.grey,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-          const SizedBox(height: 3),
-          Text(
-            value,
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-            style: const TextStyle(
-              fontSize: 11,
-              fontWeight: FontWeight.w600,
-              color: Colors.black87,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
+TextStyle _titleStyle(double size) => GoogleFonts.plusJakartaSans(
+  fontSize: size,
+  fontWeight: FontWeight.w800,
+  color: _ink,
+);

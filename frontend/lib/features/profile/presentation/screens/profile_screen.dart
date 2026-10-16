@@ -4,6 +4,8 @@ import 'package:google_fonts/google_fonts.dart';
 import '../../../auth/presentation/screens/login_screen.dart';
 import '../../../home/presentation/screens/home_screen.dart';
 import '../../../my_listings/presentation/screens/my_listings_screen.dart';
+import '../../../settings/presentation/screens/settings_screen.dart';
+import '../../../help_center/presentation/screens/help_center_screen.dart';
 
 const _bg = Color(0xFFFBF9FF);
 const _surface = Colors.white;
@@ -230,15 +232,18 @@ class ProfileScreen extends StatelessWidget {
             icon: Icons.settings_outlined,
             title: 'Account settings',
             subtitle: 'Payouts, addresses & security',
-            onTap: () =>
-                _showMessage(context, 'Account settings opened locally.'),
+            onTap: () => Navigator.of(
+              context,
+            ).push(MaterialPageRoute(builder: (_) => const SettingsScreen())),
           ),
           const _MenuDivider(),
           _MenuTile(
             icon: Icons.help_outline_rounded,
             title: 'Help center',
             subtitle: 'Authentication rules & buyer protection',
-            onTap: () => _showMessage(context, 'Help center is ready.'),
+            onTap: () => Navigator.of(
+              context,
+            ).push(MaterialPageRoute(builder: (_) => const HelpCenterScreen())),
           ),
         ],
       ),

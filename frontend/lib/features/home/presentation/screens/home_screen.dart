@@ -4,6 +4,8 @@ import 'package:google_fonts/google_fonts.dart';
 import '../../../profile/presentation/screens/profile_screen.dart';
 import '../../../my_listings/presentation/screens/my_listings_screen.dart';
 import '../../../add_product/presentation/screens/add_product_screen.dart';
+import '../../../notifications/presentation/screens/notifications_screen.dart';
+import '../../../product_detail/presentation/screens/product_detail.dart';
 import 'filter_screen.dart';
 
 const _background = Color(0xFFFBF9FF);
@@ -68,6 +70,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     product: _visibleProducts[index],
                     inCart: _cart.contains(_visibleProducts[index]),
                     onAddToCart: () => _addToCart(_visibleProducts[index]),
+                    onOpen: () => _openProduct(_visibleProducts[index]),
                   ),
                   childCount: _visibleProducts.length,
                 ),
@@ -99,9 +102,8 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
       ),
       floatingActionButton: FloatingActionButton(
-        onPressed: () => Navigator.of(context).push(
-          MaterialPageRoute(builder: (_) => const AddProductScreen()),
-        ),
+        onPressed: () => Navigator.of(context)
+            .push(MaterialPageRoute(builder: (_) => const AddProductScreen())),
         backgroundColor: _darkTeal,
         foregroundColor: Colors.white,
         elevation: 3,
@@ -140,7 +142,13 @@ class _HomeScreenState extends State<HomeScreen> {
             ],
           ),
         ),
-        _roundIcon(Icons.notifications_none_rounded, hasDot: true),
+        _roundIcon(
+          Icons.notifications_none_rounded,
+          hasDot: true,
+          onTap: () => Navigator.of(context).push(
+            MaterialPageRoute(builder: (_) => const NotificationsScreen()),
+          ),
+        ),
         const SizedBox(width: 8),
         _cartButton(),
         const SizedBox(width: 8),
@@ -542,6 +550,29 @@ class _HomeScreenState extends State<HomeScreen> {
         .push(MaterialPageRoute(builder: (_) => const MyListingsScreen()));
   }
 
+  void _openProduct(_Product product) {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => ProductDetailScreen(
+          product: ProductDetailsData(
+            name: product.name,
+            brand: product.brand,
+            price: product.price,
+            distance: product.distance,
+            rating: product.rating,
+            grade: product.grade,
+            placeholderColor: product.placeholderColor,
+            iconColor: product.iconColor,
+            icon: product.icon,
+          ),
+          onAddToCart: () {
+            _addToCart(product);
+          },
+        ),
+      ),
+    );
+  }
+
   void _showLocalMessage(String message) {
     ScaffoldMessenger.of(context)
         .showSnackBar(SnackBar(content: Text(message)));
@@ -578,134 +609,144 @@ class _ProductCard extends StatelessWidget {
     required this.product,
     required this.onAddToCart,
     required this.inCart,
+    required this.onOpen,
   });
 
   final _Product product;
   final VoidCallback onAddToCart;
   final bool inCart;
+  final VoidCallback onOpen;
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        color: _surface,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: _line),
-      ),
-      clipBehavior: Clip.antiAlias,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Expanded(
-            flex: 11,
-            child: Stack(
-              fit: StackFit.expand,
-              children: [
-                Container(color: product.placeholderColor),
-                Center(
-                  child: Icon(product.icon, size: 44, color: product.iconColor),
-                ),
-                Positioned(top: 9, left: 9, child: _gradePill(product.grade)),
-                const Positioned(
-                  top: 7,
-                  right: 7,
-                  child: CircleAvatar(
-                    radius: 16,
-                    backgroundColor: Colors.white,
+    return GestureDetector(
+      onTap: onOpen,
+      behavior: HitTestBehavior.opaque,
+      child: Container(
+        decoration: BoxDecoration(
+          color: _surface,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: _line),
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              flex: 11,
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  Container(color: product.placeholderColor),
+                  Center(
                     child: Icon(
-                      Icons.favorite_border_rounded,
-                      size: 19,
-                      color: _darkTeal,
+                      product.icon,
+                      size: 44,
+                      color: product.iconColor,
                     ),
                   ),
-                ),
-                Positioned(
-                  bottom: 8,
-                  left: 9,
-                  child: _distancePill(product.distance),
-                ),
-                Positioned(
-                  bottom: 7,
-                  right: 7,
-                  child: Material(
-                    color: Colors.white,
-                    shape: const CircleBorder(),
-                    child: IconButton(
-                      tooltip: inCart ? 'Already in cart' : 'Add to cart',
-                      onPressed: onAddToCart,
-                      visualDensity: VisualDensity.compact,
-                      icon: Icon(
-                        inCart
-                            ? Icons.shopping_cart_rounded
-                            : Icons.add_shopping_cart_rounded,
-                        size: 18,
+                  Positioned(top: 9, left: 9, child: _gradePill(product.grade)),
+                  const Positioned(
+                    top: 7,
+                    right: 7,
+                    child: CircleAvatar(
+                      radius: 16,
+                      backgroundColor: Colors.white,
+                      child: Icon(
+                        Icons.favorite_border_rounded,
+                        size: 19,
                         color: _darkTeal,
                       ),
                     ),
                   ),
-                ),
-              ],
-            ),
-          ),
-          Expanded(
-            flex: 8,
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(10, 9, 10, 8),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    product.brand.toUpperCase(),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: GoogleFonts.plusJakartaSans(
-                      fontSize: 9,
-                      fontWeight: FontWeight.w800,
-                      letterSpacing: 0.4,
-                      color: _tealText,
-                    ),
+                  Positioned(
+                    bottom: 8,
+                    left: 9,
+                    child: _distancePill(product.distance),
                   ),
-                  const SizedBox(height: 2),
-                  Text(
-                    product.name,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: GoogleFonts.plusJakartaSans(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w700,
-                      color: _ink,
-                    ),
-                  ),
-                  const Spacer(),
-                  Row(
-                    children: [
-                      Text(
-                        product.price,
-                        style: GoogleFonts.plusJakartaSans(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w800,
-                          color: _ink,
+                  Positioned(
+                    bottom: 7,
+                    right: 7,
+                    child: Material(
+                      color: Colors.white,
+                      shape: const CircleBorder(),
+                      child: IconButton(
+                        tooltip: inCart ? 'Already in cart' : 'Add to cart',
+                        onPressed: onAddToCart,
+                        visualDensity: VisualDensity.compact,
+                        icon: Icon(
+                          inCart
+                              ? Icons.shopping_cart_rounded
+                              : Icons.add_shopping_cart_rounded,
+                          size: 18,
+                          color: _darkTeal,
                         ),
                       ),
-                      const Spacer(),
-                      const Icon(Icons.star_rounded, size: 14, color: _green),
-                      const SizedBox(width: 2),
-                      Text(
-                        product.rating,
-                        style: GoogleFonts.plusJakartaSans(
-                          fontSize: 10,
-                          color: _muted,
-                        ),
-                      ),
-                    ],
+                    ),
                   ),
-                  const SizedBox(height: 5),
-                  _labelPill('Local pickup', const Color(0xFFF1F2F4)),
                 ],
               ),
             ),
-          ),
-        ],
+            Expanded(
+              flex: 8,
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(10, 9, 10, 8),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      product.brand.toUpperCase(),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: GoogleFonts.plusJakartaSans(
+                        fontSize: 9,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: 0.4,
+                        color: _tealText,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      product.name,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: GoogleFonts.plusJakartaSans(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                        color: _ink,
+                      ),
+                    ),
+                    const Spacer(),
+                    Row(
+                      children: [
+                        Text(
+                          product.price,
+                          style: GoogleFonts.plusJakartaSans(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w800,
+                            color: _ink,
+                          ),
+                        ),
+                        const Spacer(),
+                        const Icon(Icons.star_rounded, size: 14, color: _green),
+                        const SizedBox(width: 2),
+                        Text(
+                          product.rating,
+                          style: GoogleFonts.plusJakartaSans(
+                            fontSize: 10,
+                            color: _muted,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 5),
+                    _labelPill('Local pickup', const Color(0xFFF1F2F4)),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
