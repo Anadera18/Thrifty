@@ -1,344 +1,81 @@
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
+
+import '../../../ai_grading/presentation/screens/ai_grading_result_screen.dart';
 
 const Color _green = Color(0xFF006828);
 
 class AddProductScreen extends StatefulWidget {
-  const AddProductScreen({Key? key}) : super(key: key);
+  const AddProductScreen({super.key});
 
   @override
   State<AddProductScreen> createState() => _AddProductScreenState();
 }
 
 class _AddProductScreenState extends State<AddProductScreen> {
-  String selectedCategory = 'T-Shirt';
+  final ImagePicker _picker = ImagePicker();
+  final List<Uint8List> _photos = [];
+  String _selectedCategory = 'T-Shirt';
+  String? _grade;
+  bool _pickingPhoto = false;
 
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.grey[50],
-      appBar: AppBar(
-        backgroundColor: Colors.white,
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.black),
-          onPressed: () => Navigator.pop(context),
-        ),
-        title: const Text(
-          'Sell An Item',
-          style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 18),
-        ),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.move_to_inbox_outlined, color: Colors.black),
-            onPressed: () {},
+  Future<void> _addPhotos(ImageSource source) async {
+    if (_pickingPhoto || _photos.length >= 6) return;
+    setState(() => _pickingPhoto = true);
+    try {
+      final remaining = 6 - _photos.length;
+      if (source == ImageSource.gallery) {
+        final selected = await _picker.pickMultiImage(imageQuality: 85);
+        if (!mounted || selected.isEmpty) return;
+        final photos = await Future.wait(
+          selected.take(remaining).map((photo) => photo.readAsBytes()),
+        );
+        if (!mounted) return;
+        setState(() => _photos.addAll(photos));
+      } else {
+        final photo = await _picker.pickImage(source: source, imageQuality: 85);
+        if (!mounted || photo == null) return;
+        final bytes = await photo.readAsBytes();
+        if (!mounted) return;
+        setState(() => _photos.add(bytes));
+      }
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Could not open your photos. Please try again.'),
           ),
-          IconButton(
-            icon: const Icon(Icons.account_circle_outlined, color: Colors.black),
-            onPressed: () {},
-          ),
-        ],
-      ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAlignment.start,
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _pickingPhoto = false);
+    }
+  }
+
+  Future<void> _showPhotoPicker() async {
+    if (_photos.length >= 6 || _pickingPhoto) return;
+    await showModalBottomSheet<void>(
+      context: context,
+      builder: (sheetContext) => SafeArea(
+        child: Wrap(
           children: [
-            // Header Progress Step
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Row(
-                  children: [
-                    CircleAvatar(
-                      radius: 10,
-                      backgroundColor: Colors.teal[100],
-                      child: const Text('1', style: TextStyle(fontSize: 10, color: Colors.teal, fontWeight: FontWeight.bold)),
-                    ),
-                    const SizedBox(width: 8),
-                    const Text(
-                      'Step 1 of 3: AI Condition & Specs',
-                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
-                    ),
-                  ],
-                ),
-                Text(
-                  '33% DONE',
-                  style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.teal[700]),
-                ),
-              ],
+            ListTile(
+              leading: const Icon(Icons.photo_library_outlined),
+              title: const Text('Choose from gallery'),
+              onTap: () {
+                Navigator.pop(sheetContext);
+                _addPhotos(ImageSource.gallery);
+              },
             ),
-            const SizedBox(height: 8),
-            ClipRRect(
-              borderRadius: BorderRadius.circular(4),
-              child: LinearProgressIndicator(
-                value: 0.33,
-                backgroundColor: Colors.teal[50],
-                color: Colors.teal,
-                minHeight: 6,
-              ),
-            ),
-            const SizedBox(height: 20),
-
-            // Garment Photos Header
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: const [
-                Text(
-                  'Garment Photos',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                ),
-                Text(
-                  '1/6 Photos',
-                  style: TextStyle(fontSize: 12, color: Colors.grey, fontWeight: FontWeight.w600),
-                ),
-              ],
-            ),
-            const SizedBox(height: 4),
-            const Text(
-              'Capture natural light and clean angles for fast AI valuation.',
-              style: TextStyle(color: Colors.grey, fontSize: 12),
-            ),
-            const SizedBox(height: 16),
-
-            // Grid Foto
-            Row(
-              children: [
-                // Card Foto Terunggah
-                Expanded(
-                  child: Container(
-                    height: 180,
-                    decoration: BoxDecoration(
-                      color: Colors.grey[300],
-                      borderRadius: BorderRadius.circular(16),
-                      image: const DecorationImage(
-                        image: NetworkImage('https://picsum.photos/300/300'), // Ganti dengan Image.file
-                        fit: BoxFit.cover,
-                      ),
-                    ),
-                    child: Stack(
-                      children: [
-                        Positioned(
-                          top: 8,
-                          right: 8,
-                          child: Row(
-                            children: [
-                              CircleAvatar(
-                                radius: 14,
-                                backgroundColor: Colors.white,
-                                child: Icon(Icons.crop, size: 14, color: Colors.grey[700]),
-                              ),
-                              const SizedBox(width: 4),
-                              CircleAvatar(
-                                radius: 14,
-                                backgroundColor: Colors.white,
-                                child: Icon(Icons.delete_outline, size: 14, color: Colors.red[400]),
-                              ),
-                            ],
-                          ),
-                        ),
-                        Positioned(
-                          bottom: 8,
-                          left: 8,
-                          right: 8,
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                            decoration: BoxDecoration(
-                              color: Colors.white.withOpacity(0.9),
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: Row(
-                              children: [
-                                const Icon(Icons.auto_awesome, size: 12, color: Colors.green),
-                                const SizedBox(width: 4),
-                                const Expanded(
-                                  child: Text(
-                                    'Analyzing condition...\nFabric weave & neckline',
-                                    style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 12),
-
-                // Card Tambah Foto
-                Expanded(
-                  child: Container(
-                    height: 180,
-                    decoration: BoxDecoration(
-                      color: Colors.blue[50]?.withOpacity(0.5),
-                      borderRadius: BorderRadius.circular(16),
-                      border: Border.all(color: Colors.blue[100]!),
-                    ),
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        CircleAvatar(
-                          radius: 20,
-                          backgroundColor: Colors.blue[100]?.withOpacity(0.5),
-                          child: const Icon(Icons.add_a_photo_outlined, color: Colors.blue),
-                        ),
-                        const SizedBox(height: 8),
-                        const Text('Add photo', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-                        const Text('Front, back, or tags', style: TextStyle(color: Colors.grey, fontSize: 11)),
-                        const SizedBox(height: 4),
-                        Text('+5 slots left', style: TextStyle(color: Colors.blue[700], fontSize: 10, fontWeight: FontWeight.bold)),
-                      ],
-                    ),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-
-            // Banner Tip Pro-Seller
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: Colors.cyan[50]?.withOpacity(0.6),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Row(
-                children: [
-                  CircleAvatar(
-                    radius: 16,
-                    backgroundColor: Colors.cyan[100],
-                    child: const Icon(Icons.lightbulb_outline, color: Colors.cyan, size: 18),
-                  ),
-                  const SizedBox(width: 12),
-                  const Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAlignment.start,
-                      children: [
-                        Text('Pro-Seller Photography Tip', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
-                        SizedBox(height: 2),
-                        Text(
-                          'Upload clear photos on a plain background for accurate AI grading, instant brand detection, and higher neighborhood visibility.',
-                          style: TextStyle(fontSize: 10, color: Colors.black87),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 16),
-
-            // AI Match Result Card
-            Container(
-              padding: const EdgeInsets.all(14),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: Colors.grey[200]!),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAlignment.start,
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Row(
-                        children: const [
-                          Icon(Icons.verified, size: 14, color: Colors.teal),
-                          SizedBox(width: 4),
-                          Text('PRELOVED CIRCULAR MATCH', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.teal)),
-                        ],
-                      ),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                        decoration: BoxDecoration(
-                          color: Colors.indigo[50],
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: const Text('94% Confidence', style: TextStyle(fontSize: 10, color: Colors.indigo, fontWeight: FontWeight.bold)),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  const Text('AI detected: Graphic Vintage Streetwear Tee', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-                  const SizedBox(height: 4),
-                  const Text(
-                    'Single stitch detail identified. Washed charcoal tone detected with front screenprint motif.',
-                    style: TextStyle(fontSize: 11, color: Colors.grey),
-                  ),
-                  const SizedBox(height: 10),
-                  Wrap(
-                    spacing: 6,
-                    runSpacing: 6,
-                    children: [
-                      _buildChip('100% Heavyweight Cotton'),
-                      _buildChip('Relaxed Fit'),
-                      _buildChip('Like New Grade A'),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 20),
-
-            // Pilihan Kategori
-            Row(
-              children: const [
-                Text('CATEGORY ', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-                Text('*', style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold)),
-                Spacer(),
-                Text('Required', style: TextStyle(color: Colors.grey, fontSize: 12)),
-              ],
-            ),
-            const SizedBox(height: 12),
-
-            GridView.count(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              crossAxisCount: 2,
-              childAspectRatio: 2.2,
-              crossAxisSpacing: 10,
-              mainAxisSpacing: 10,
-              children: [
-                _buildCategoryCard('Shirt', 'Button-down, collared', Icons.checkroom, selectedCategory == 'Shirt'),
-                _buildCategoryCard('T-Shirt', 'Short & long sleeves, tees', Icons.checkroom, selectedCategory == 'T-Shirt'),
-                _buildCategoryCard('Pants', 'Denim, trousers, shorts', Icons.dry_cleaning, selectedCategory == 'Pants'),
-                _buildCategoryCard('Jacket', 'Blazers, coats, knits', Icons.checkroom_outlined, selectedCategory == 'Jacket'),
-              ],
-            ),
-            const SizedBox(height: 24),
-
-            // Tombol Continue
-            SizedBox(
-              width: double.infinity,
-              height: 48,
-              child: ElevatedButton(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF006828),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-                ),
-                onPressed: () {
-                  // Tambahkan alur navigasi ke AiGradingResultScreen
-                },
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: const [
-                    Text('Continue', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Colors.white)),
-                    SizedBox(width: 6),
-                    Icon(Icons.chevron_right, color: Colors.white),
-                  ],
-                ),
-              ),
-            ),
-            const SizedBox(height: 8),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: const [
-                Icon(Icons.lock_outline, size: 12, color: Colors.grey),
-                SizedBox(width: 4),
-                Text('Draft safely auto-saved to your wardrobe', style: TextStyle(fontSize: 10, color: Colors.grey)),
-              ],
+            ListTile(
+              leading: const Icon(Icons.camera_alt_outlined),
+              title: const Text('Take a photo'),
+              onTap: () {
+                Navigator.pop(sheetContext);
+                _addPhotos(ImageSource.camera);
+              },
             ),
           ],
         ),
@@ -346,56 +83,213 @@ class _AddProductScreenState extends State<AddProductScreen> {
     );
   }
 
-  Widget _buildChip(String label) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-      decoration: BoxDecoration(
-        color: Colors.blue[50],
-        borderRadius: BorderRadius.circular(12),
+  Future<void> _continue() async {
+    if (_photos.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Add at least one item photo to continue.'),
+        ),
+      );
+      return;
+    }
+    final result = await Navigator.of(context).push<String>(
+      MaterialPageRoute(
+        builder: (_) => AiGradingResultScreen(
+          imageBytes: List<Uint8List>.unmodifiable(_photos),
+          category: _selectedCategory,
+        ),
       ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          const Icon(Icons.check, size: 12, color: Colors.blue),
-          const SizedBox(width: 4),
-          Text(label, style: TextStyle(fontSize: 10, color: Colors.blue[900], fontWeight: FontWeight.bold)),
-        ],
-      ),
+    );
+    if (!mounted || result == null) return;
+    setState(() => _grade = result);
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('$result saved to this listing draft.')),
     );
   }
 
-  Widget _buildCategoryCard(String title, String subtitle, IconData icon, bool isSelected) {
-    return GestureDetector(
-      onTap: () {
-        setState(() {
-          selectedCategory = title;
-        });
-      },
-      child: Container(
-        padding: const EdgeInsets.all(10),
-        decoration: BoxDecoration(
-          color: isSelected ? const Color(0xFF053B36) : Colors.white,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: isSelected ? const Color(0xFF053B36) : Colors.grey[200]!),
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.grey.shade50,
+      appBar: AppBar(
+        backgroundColor: Colors.white,
+        title: const Text(
+          'Sell an item',
+          style: TextStyle(fontWeight: FontWeight.bold),
         ),
+      ),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(16),
         child: Column(
-          crossAxisAlignment: CrossAlignment.start,
-          mainAxisAlignment: MainAxisAlignment.center,
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: const [
+                Text(
+                  'Step 1 of 3: Photos & category',
+                  style: TextStyle(fontWeight: FontWeight.bold),
+                ),
+                Text(
+                  '33%',
+                  style: TextStyle(color: _green, fontWeight: FontWeight.bold),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            const LinearProgressIndicator(value: 1 / 3, color: _green),
+            const SizedBox(height: 24),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Icon(icon, color: isSelected ? Colors.white : Colors.black87, size: 20),
-                Icon(
-                  isSelected ? Icons.check_circle : Icons.circle_outlined,
-                  color: isSelected ? Colors.tealAccent : Colors.grey[300],
-                  size: 16,
+                const Text(
+                  'Item photos',
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                ),
+                Text(
+                  '${_photos.length}/6 photos',
+                  style: const TextStyle(color: Colors.grey),
                 ),
               ],
             ),
             const SizedBox(height: 4),
-            Text(title, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: isSelected ? Colors.white : Colors.black87)),
-            Text(subtitle, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 9, color: isSelected ? Colors.white70 : Colors.grey)),
+            const Text(
+              'Add clear photos of the front, back, labels, and any wear.',
+              style: TextStyle(color: Colors.grey),
+            ),
+            const SizedBox(height: 12),
+            GridView.builder(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              itemCount: _photos.length + (_photos.length < 6 ? 1 : 0),
+              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: 2,
+                crossAxisSpacing: 12,
+                mainAxisSpacing: 12,
+                childAspectRatio: 1.1,
+              ),
+              itemBuilder: (context, index) {
+                if (index == _photos.length) {
+                  return OutlinedButton(
+                    onPressed: _pickingPhoto ? null : _showPhotoPicker,
+                    style: OutlinedButton.styleFrom(
+                      backgroundColor: Colors.white,
+                      side: BorderSide(color: Colors.blue.shade100),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                    ),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          _pickingPhoto
+                              ? Icons.hourglass_top
+                              : Icons.add_a_photo_outlined,
+                          color: Colors.blue,
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          _pickingPhoto ? 'Opening…' : 'Add photo',
+                          style: const TextStyle(fontWeight: FontWeight.bold),
+                        ),
+                        Text(
+                          '${6 - _photos.length} slots left',
+                          style: const TextStyle(
+                            color: Colors.grey,
+                            fontSize: 12,
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                }
+                return ClipRRect(
+                  borderRadius: BorderRadius.circular(16),
+                  child: Stack(
+                    fit: StackFit.expand,
+                    children: [
+                      Image.memory(_photos[index], fit: BoxFit.cover),
+                      Positioned(
+                        top: 6,
+                        right: 6,
+                        child: IconButton.filled(
+                          tooltip: 'Remove photo',
+                          style: IconButton.styleFrom(
+                            backgroundColor: Colors.white,
+                          ),
+                          onPressed: () =>
+                              setState(() => _photos.removeAt(index)),
+                          icon: const Icon(
+                            Icons.delete_outline,
+                            color: Colors.red,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              },
+            ),
+            const SizedBox(height: 20),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.amber.shade50,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: const Text(
+                'Photo grading is a demo in this build. Review the result yourself before describing your item.',
+                style: TextStyle(fontSize: 13),
+              ),
+            ),
+            const SizedBox(height: 24),
+            const Text(
+              'Category *',
+              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+            ),
+            const SizedBox(height: 12),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: ['Shirt', 'T-Shirt', 'Pants', 'Jacket'].map((category) {
+                return ChoiceChip(
+                  label: Text(category),
+                  selected: _selectedCategory == category,
+                  onSelected: (_) =>
+                      setState(() => _selectedCategory = category),
+                  selectedColor: Colors.green.shade100,
+                );
+              }).toList(),
+            ),
+            if (_grade != null) ...[
+              const SizedBox(height: 12),
+              Text(
+                'Draft condition: $_grade',
+                style: const TextStyle(
+                  color: _green,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+            const SizedBox(height: 24),
+            SizedBox(
+              width: double.infinity,
+              height: 50,
+              child: ElevatedButton.icon(
+                onPressed: _continue,
+                icon: const Icon(Icons.chevron_right),
+                label: const Text('Continue to condition review'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: _green,
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(24),
+                  ),
+                ),
+              ),
+            ),
           ],
         ),
       ),

@@ -101,6 +101,11 @@ class _FilterSearchScreenState extends State<FilterSearchScreen> {
         ),
         actions: [
           IconButton(
+            tooltip: 'Sell an item',
+            icon: const Icon(Icons.add_circle_outline, color: _green),
+            onPressed: () => Navigator.pushNamed(context, '/sell-item'),
+          ),
+          IconButton(
             icon: const Icon(Icons.refresh, color: Colors.black87),
             onPressed: _resetFilters,
           ),

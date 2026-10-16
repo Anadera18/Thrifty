@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import 'features/auth/presentation/screens/login_screen.dart';
+import 'features/onboarding/presentation/screens/welcome_flow.dart';
 import 'features/search/presentation/screens/search.dart';
 import 'features/product_detail/presentation/screens/product_detail.dart';
+import 'features/add_product/presentation/screens/add_product_screen.dart';
 
 void main() {
   runApp(const ProviderScope(child: ThriftyApp()));
@@ -23,12 +24,13 @@ class ThriftyApp extends StatelessWidget {
       ),
 
       // Halaman pertama aplikasi
-      home: const  FilterSearchScreen(),
+      home: const ThriftySplashScreen(),
 
       // Daftar rute halaman
       routes: {
         '/search': (context) => const FilterSearchScreen(),
         '/product-detail': (context) => const ProductDetailScreen(),
+        '/sell-item': (context) => const AddProductScreen(),
       },
     );
   }

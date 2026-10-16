@@ -1,7 +1,9 @@
 import '../../../home/presentation/screens/location_onboarding_screen.dart';
+
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
+import '../widgets/thrifty_logo.dart';
 import 'register_screen.dart';
 
 const _bg = Color(0xFFFBF9FF);
@@ -63,6 +65,8 @@ class _LoginScreenState extends State<LoginScreen> {
   Widget _buildHeader() {
     return Column(
       children: [
+        const ThriftyLogo(size: 64),
+        const SizedBox(height: 10),
         Text(
           'THRIFTY',
           style: GoogleFonts.plusJakartaSans(
@@ -301,13 +305,13 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   Widget _label(String text) => Text(
-        text,
-        style: GoogleFonts.plusJakartaSans(
-          fontSize: 12.5,
-          fontWeight: FontWeight.w700,
-          color: _ink,
-        ),
-      );
+    text,
+    style: GoogleFonts.plusJakartaSans(
+      fontSize: 12.5,
+      fontWeight: FontWeight.w700,
+      color: _ink,
+    ),
+  );
 
   InputDecoration _inputDecoration({
     required String hint,

@@ -3,6 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 
 import '../../../profile/presentation/screens/profile_screen.dart';
 import '../../../my_listings/presentation/screens/my_listings_screen.dart';
+import '../../../add_product/presentation/screens/add_product_screen.dart';
 import 'filter_screen.dart';
 
 const _background = Color(0xFFFBF9FF);
@@ -98,8 +99,9 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
       ),
       floatingActionButton: FloatingActionButton(
-        onPressed: () =>
-            _showLocalMessage('Add listing is ready for your next item.'),
+        onPressed: () => Navigator.of(context).push(
+          MaterialPageRoute(builder: (_) => const AddProductScreen()),
+        ),
         backgroundColor: _darkTeal,
         foregroundColor: Colors.white,
         elevation: 3,
