@@ -4,8 +4,11 @@ import 'package:google_fonts/google_fonts.dart';
 import '../../../profile/presentation/screens/profile_screen.dart';
 import '../../../my_listings/presentation/screens/my_listings_screen.dart';
 import '../../../add_product/presentation/screens/add_product_screen.dart';
+import '../../../checkout/presentation/screens/checkout_screen.dart';
 import '../../../notifications/presentation/screens/notifications_screen.dart';
 import '../../../product_detail/presentation/screens/product_detail.dart';
+import '../../../profile/presentation/state/account_mode_store.dart';
+import '../../../saved_items/presentation/screens/saved_items_screen.dart';
 import 'filter_screen.dart';
 
 const _background = Color(0xFFFBF9FF);
@@ -34,9 +37,26 @@ class _HomeScreenState extends State<HomeScreen> {
   String _condition = 'A';
 
   @override
+  void initState() {
+    super.initState();
+    SavedProductsStore.items.addListener(_refreshSavedProducts);
+    AccountModeStore.isSeller.addListener(_refreshAccountMode);
+  }
+
+  @override
   void dispose() {
+    SavedProductsStore.items.removeListener(_refreshSavedProducts);
+    AccountModeStore.isSeller.removeListener(_refreshAccountMode);
     _searchController.dispose();
     super.dispose();
+  }
+
+  void _refreshSavedProducts() {
+    if (mounted) setState(() {});
+  }
+
+  void _refreshAccountMode() {
+    if (mounted) setState(() {});
   }
 
   @override
@@ -71,6 +91,10 @@ class _HomeScreenState extends State<HomeScreen> {
                     inCart: _cart.contains(_visibleProducts[index]),
                     onAddToCart: () => _addToCart(_visibleProducts[index]),
                     onOpen: () => _openProduct(_visibleProducts[index]),
+                    isSaved: SavedProductsStore.contains(
+                      _productDetails(_visibleProducts[index]),
+                    ),
+                    onToggleSaved: () => _toggleSaved(_visibleProducts[index]),
                   ),
                   childCount: _visibleProducts.length,
                 ),
@@ -101,14 +125,17 @@ class _HomeScreenState extends State<HomeScreen> {
           ],
         ),
       ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () => Navigator.of(context)
-            .push(MaterialPageRoute(builder: (_) => const AddProductScreen())),
-        backgroundColor: _darkTeal,
-        foregroundColor: Colors.white,
-        elevation: 3,
-        child: const Icon(Icons.add_rounded, size: 28),
-      ),
+      floatingActionButton: AccountModeStore.isSeller.value
+          ? FloatingActionButton(
+              onPressed: () => Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => const AddProductScreen()),
+              ),
+              backgroundColor: _darkTeal,
+              foregroundColor: Colors.white,
+              elevation: 3,
+              child: const Icon(Icons.add_rounded, size: 28),
+            )
+          : null,
       floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
       bottomNavigationBar: _buildBottomNavigation(),
     );
@@ -417,9 +444,10 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildBottomNavigation() {
+    final isSeller = AccountModeStore.isSeller.value;
     return BottomAppBar(
       color: _surface,
-      shape: const CircularNotchedRectangle(),
+      shape: isSeller ? const CircularNotchedRectangle() : null,
       notchMargin: 8,
       child: SizedBox(
         height: 58,
@@ -428,8 +456,12 @@ class _HomeScreenState extends State<HomeScreen> {
           children: [
             _navItem(Icons.home_outlined, 'Home', 0),
             _navItem(Icons.explore_outlined, 'Explore', 1),
-            const SizedBox(width: 44),
-            _navItem(Icons.sell_outlined, 'Listings', 2),
+            if (isSeller) const SizedBox(width: 44),
+            _navItem(
+              isSeller ? Icons.sell_outlined : Icons.bookmark_outline_rounded,
+              isSeller ? 'Listings' : 'Saved',
+              2,
+            ),
             _navItem(Icons.person_outline_rounded, 'Profile', 3),
           ],
         ),
@@ -470,7 +502,12 @@ class _HomeScreenState extends State<HomeScreen> {
     } else if (index == 3) {
       _openProfile(context);
     } else if (index == 2) {
-      _openListings(context);
+      if (AccountModeStore.isSeller.value) {
+        _openListings(context);
+      } else {
+        Navigator.of(context)
+            .push(MaterialPageRoute(builder: (_) => const SavedItemsScreen()));
+      }
     }
   }
 
@@ -554,22 +591,35 @@ class _HomeScreenState extends State<HomeScreen> {
     Navigator.of(context).push(
       MaterialPageRoute(
         builder: (_) => ProductDetailScreen(
-          product: ProductDetailsData(
-            name: product.name,
-            brand: product.brand,
-            price: product.price,
-            distance: product.distance,
-            rating: product.rating,
-            grade: product.grade,
-            placeholderColor: product.placeholderColor,
-            iconColor: product.iconColor,
-            icon: product.icon,
-          ),
+          product: _productDetails(product),
           onAddToCart: () {
             _addToCart(product);
           },
         ),
       ),
+    );
+  }
+
+  ProductDetailsData _productDetails(_Product product) => ProductDetailsData(
+    name: product.name,
+    brand: product.brand,
+    price: product.price,
+    distance: product.distance,
+    rating: product.rating,
+    grade: product.grade,
+    placeholderColor: product.placeholderColor,
+    iconColor: product.iconColor,
+    icon: product.icon,
+  );
+
+  void _toggleSaved(_Product product) {
+    final details = _productDetails(product);
+    SavedProductsStore.toggle(details);
+    setState(() {});
+    _showLocalMessage(
+      SavedProductsStore.contains(details)
+          ? 'Saved to your items.'
+          : 'Removed from saved items.',
     );
   }
 
@@ -593,15 +643,30 @@ class _HomeScreenState extends State<HomeScreen> {
         builder: (_) => _CartScreen(
           items: _cart,
           onRemove: (product) => setState(() => _cart.remove(product)),
-          onCheckout: () {
+          onCheckout: () async {
+            final paymentMethod = await Navigator.of(context).push<String>(
+              MaterialPageRoute(
+                builder: (_) => CheckoutScreen(
+                  subtotal: _cartTotal,
+                  itemCount: _cart.length,
+                ),
+              ),
+            );
+            if (paymentMethod == null || !mounted) return;
             setState(_cart.clear);
             Navigator.of(context).pop();
-            _showLocalMessage('Checkout complete (demo).');
+            _showLocalMessage('Order placed via $paymentMethod.');
           },
         ),
       ),
     );
   }
+
+  int get _cartTotal => _cart.fold(
+    0,
+    (sum, item) =>
+        sum + (int.tryParse(item.price.replaceAll(RegExp(r'[^0-9]'), '')) ?? 0),
+  );
 }
 
 class _ProductCard extends StatelessWidget {
@@ -610,12 +675,16 @@ class _ProductCard extends StatelessWidget {
     required this.onAddToCart,
     required this.inCart,
     required this.onOpen,
+    required this.isSaved,
+    required this.onToggleSaved,
   });
 
   final _Product product;
   final VoidCallback onAddToCart;
   final bool inCart;
   final VoidCallback onOpen;
+  final bool isSaved;
+  final VoidCallback onToggleSaved;
 
   @override
   Widget build(BuildContext context) {
@@ -646,16 +715,23 @@ class _ProductCard extends StatelessWidget {
                     ),
                   ),
                   Positioned(top: 9, left: 9, child: _gradePill(product.grade)),
-                  const Positioned(
+                  Positioned(
                     top: 7,
                     right: 7,
-                    child: CircleAvatar(
-                      radius: 16,
-                      backgroundColor: Colors.white,
-                      child: Icon(
-                        Icons.favorite_border_rounded,
-                        size: 19,
-                        color: _darkTeal,
+                    child: Material(
+                      color: Colors.white,
+                      shape: const CircleBorder(),
+                      child: IconButton(
+                        tooltip: isSaved ? 'Remove saved item' : 'Save item',
+                        onPressed: onToggleSaved,
+                        visualDensity: VisualDensity.compact,
+                        icon: Icon(
+                          isSaved
+                              ? Icons.favorite_rounded
+                              : Icons.favorite_border_rounded,
+                          size: 18,
+                          color: isSaved ? const Color(0xFFDC2626) : _darkTeal,
+                        ),
                       ),
                     ),
                   ),
@@ -815,7 +891,7 @@ class _CartScreen extends StatefulWidget {
 
   final List<_Product> items;
   final ValueChanged<_Product> onRemove;
-  final VoidCallback onCheckout;
+  final Future<void> Function() onCheckout;
 
   @override
   State<_CartScreen> createState() => _CartScreenState();
@@ -975,7 +1051,7 @@ class _CartScreenState extends State<_CartScreen> {
                       width: double.infinity,
                       height: 48,
                       child: ElevatedButton(
-                        onPressed: widget.onCheckout,
+                        onPressed: () => widget.onCheckout(),
                         style: ElevatedButton.styleFrom(
                           backgroundColor: _darkTeal,
                           foregroundColor: Colors.white,

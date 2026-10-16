@@ -109,22 +109,31 @@ class _AiGradingResultScreenState extends State<AiGradingResultScreen> {
                   ),
                   const SizedBox(height: 8),
                   _ConditionOption(
-                    title: 'Like new',
-                    detail: 'No visible wear or damage.',
-                    selected: _condition == 'Like new',
-                    onTap: () => setState(() => _condition = 'Like new'),
+                    title: 'Grade A · Like new',
+                    detail:
+                        'Excellent condition with little to no visible wear.',
+                    selected: _condition == 'Grade A · Like new',
+                    onTap: () =>
+                        setState(() => _condition = 'Grade A · Like new'),
                   ),
                   _ConditionOption(
-                    title: 'Good',
-                    detail: 'Light wear; no major flaws.',
-                    selected: _condition == 'Good',
-                    onTap: () => setState(() => _condition = 'Good'),
+                    title: 'Grade B · Good',
+                    detail: 'Light signs of wear with no major flaws.',
+                    selected: _condition == 'Grade B · Good',
+                    onTap: () => setState(() => _condition = 'Grade B · Good'),
                   ),
                   _ConditionOption(
-                    title: 'Fair',
-                    detail: 'Visible wear or flaws that should be described.',
-                    selected: _condition == 'Fair',
-                    onTap: () => setState(() => _condition = 'Fair'),
+                    title: 'Grade C · Fair',
+                    detail: 'Noticeable wear; describe visible flaws clearly.',
+                    selected: _condition == 'Grade C · Fair',
+                    onTap: () => setState(() => _condition = 'Grade C · Fair'),
+                  ),
+                  _ConditionOption(
+                    title: 'Grade D · Well worn',
+                    detail: 'Heavy wear or repairs; show all flaws in photos.',
+                    selected: _condition == 'Grade D · Well worn',
+                    onTap: () =>
+                        setState(() => _condition = 'Grade D · Well worn'),
                   ),
                 ],
               ),

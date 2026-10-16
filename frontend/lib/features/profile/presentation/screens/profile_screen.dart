@@ -4,8 +4,11 @@ import 'package:google_fonts/google_fonts.dart';
 import '../../../auth/presentation/screens/login_screen.dart';
 import '../../../home/presentation/screens/home_screen.dart';
 import '../../../my_listings/presentation/screens/my_listings_screen.dart';
+import '../../../product_detail/presentation/screens/product_detail.dart';
+import '../../../saved_items/presentation/screens/saved_items_screen.dart';
 import '../../../settings/presentation/screens/settings_screen.dart';
 import '../../../help_center/presentation/screens/help_center_screen.dart';
+import '../state/account_mode_store.dart';
 
 const _bg = Color(0xFFFBF9FF);
 const _surface = Colors.white;
@@ -16,11 +19,35 @@ const _darkTeal = Color(0xFF0E3436);
 const _cyanSoft = Color(0xFFCFF5FA);
 const _line = Color(0xFFE5E3EF);
 
-class ProfileScreen extends StatelessWidget {
+class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
 
   @override
+  State<ProfileScreen> createState() => _ProfileScreenState();
+}
+
+class _ProfileScreenState extends State<ProfileScreen> {
+  @override
+  void initState() {
+    super.initState();
+    AccountModeStore.isSeller.addListener(_refresh);
+    SavedProductsStore.items.addListener(_refresh);
+  }
+
+  @override
+  void dispose() {
+    AccountModeStore.isSeller.removeListener(_refresh);
+    SavedProductsStore.items.removeListener(_refresh);
+    super.dispose();
+  }
+
+  void _refresh() {
+    if (mounted) setState(() {});
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final isSeller = AccountModeStore.isSeller.value;
     return Scaffold(
       backgroundColor: _bg,
       appBar: AppBar(
@@ -50,11 +77,13 @@ class ProfileScreen extends StatelessWidget {
         padding: const EdgeInsets.fromLTRB(18, 10, 18, 24),
         child: Column(
           children: [
-            _buildIdentityCard(context),
+            _buildIdentityCard(context, isSeller),
             const SizedBox(height: 14),
-            _buildStatsRow(),
+            _buildStatsRow(isSeller),
             const SizedBox(height: 14),
-            _buildMenuCard(context),
+            _buildAccountModeCard(context, isSeller),
+            const SizedBox(height: 14),
+            _buildMenuCard(context, isSeller),
             const SizedBox(height: 16),
             _buildLogoutButton(context),
           ],
@@ -63,7 +92,7 @@ class ProfileScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildIdentityCard(BuildContext context) {
+  Widget _buildIdentityCard(BuildContext context, bool isSeller) {
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(16),
@@ -124,7 +153,7 @@ class ProfileScreen extends StatelessWidget {
                         borderRadius: BorderRadius.circular(999),
                       ),
                       child: Text(
-                        'Bandung Curator',
+                        isSeller ? 'Seller account' : 'Buyer account',
                         style: GoogleFonts.plusJakartaSans(
                           fontSize: 12,
                           fontWeight: FontWeight.w700,
@@ -156,16 +185,18 @@ class ProfileScreen extends StatelessWidget {
                 'Member since Oct 2023',
                 style: GoogleFonts.plusJakartaSans(fontSize: 13, color: _muted),
               ),
-              const Spacer(),
-              Text(
-                'TOP RATED',
-                style: GoogleFonts.plusJakartaSans(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w800,
-                  color: _green,
-                  letterSpacing: 0.3,
+              if (isSeller) ...[
+                const Spacer(),
+                Text(
+                  'TOP RATED',
+                  style: GoogleFonts.plusJakartaSans(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w800,
+                    color: _green,
+                    letterSpacing: 0.3,
+                  ),
                 ),
-              ),
+              ],
             ],
           ),
         ],
@@ -173,9 +204,25 @@ class ProfileScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildStatsRow() {
-    return Row(
-      children: const [
+  Widget _buildStatsRow(bool isSeller) {
+    if (!isSeller) {
+      return Row(
+        children: [
+          Expanded(
+            child: _StatCard(
+              value: '${SavedProductsStore.items.value.length}',
+              label: 'SAVED ITEMS',
+            ),
+          ),
+          const SizedBox(width: 10),
+          const Expanded(
+            child: _StatCard(value: '5 KM', label: 'RADIUS'),
+          ),
+        ],
+      );
+    }
+    return const Row(
+      children: [
         Expanded(
           child: _StatCard(value: '12', label: 'LISTINGS'),
         ),
@@ -191,7 +238,76 @@ class ProfileScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildMenuCard(BuildContext context) {
+  Widget _buildAccountModeCard(
+    BuildContext context,
+    bool isSeller,
+  ) => Container(
+    width: double.infinity,
+    padding: const EdgeInsets.all(14),
+    decoration: BoxDecoration(
+      color: _surface,
+      borderRadius: BorderRadius.circular(18),
+      border: Border.all(color: _line),
+    ),
+    child: Row(
+      children: [
+        Container(
+          width: 40,
+          height: 40,
+          decoration: BoxDecoration(
+            color: _cyanSoft,
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Icon(
+            isSeller ? Icons.storefront_outlined : Icons.shopping_bag_outlined,
+            color: _darkTeal,
+          ),
+        ),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Account mode',
+                style: GoogleFonts.plusJakartaSans(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w800,
+                  color: _ink,
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                isSeller ? 'Seller tools are enabled' : 'Shopping as a buyer',
+                style: GoogleFonts.plusJakartaSans(fontSize: 10, color: _muted),
+              ),
+            ],
+          ),
+        ),
+        TextButton(
+          onPressed: () {
+            AccountModeStore.toggle();
+            _showMessage(
+              context,
+              isSeller
+                  ? 'Switched to buyer account.'
+                  : 'Switched to seller account.',
+            );
+          },
+          child: Text(
+            isSeller ? 'Switch to buyer' : 'Switch to seller',
+            style: GoogleFonts.plusJakartaSans(
+              fontSize: 10,
+              fontWeight: FontWeight.w800,
+              color: _darkTeal,
+            ),
+          ),
+        ),
+      ],
+    ),
+  );
+
+  Widget _buildMenuCard(BuildContext context, bool isSeller) {
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
@@ -202,22 +318,25 @@ class ProfileScreen extends StatelessWidget {
       ),
       child: Column(
         children: [
-          _MenuTile(
-            icon: Icons.inventory_2_outlined,
-            title: 'My listings',
-            subtitle: '12 active & archived apparel',
-            trailing: '12',
-            onTap: () => Navigator.of(
-              context,
-            ).push(MaterialPageRoute(builder: (_) => const MyListingsScreen())),
-          ),
-          const _MenuDivider(),
+          if (isSeller) ...[
+            _MenuTile(
+              icon: Icons.inventory_2_outlined,
+              title: 'My listings',
+              subtitle: '12 active & archived apparel',
+              trailing: '12',
+              onTap: () => Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => const MyListingsScreen()),
+              ),
+            ),
+            const _MenuDivider(),
+          ],
           _MenuTile(
             icon: Icons.bookmark_outline_rounded,
             title: 'Saved items',
-            subtitle: 'Curated wishlist & designer archives',
-            trailing: '18',
-            onTap: () => _showMessage(context, 'Saved items opened locally.'),
+            subtitle: 'Your favorite thrift finds',
+            onTap: () => Navigator.of(
+              context,
+            ).push(MaterialPageRoute(builder: (_) => const SavedItemsScreen())),
           ),
           const _MenuDivider(),
           _MenuTile(

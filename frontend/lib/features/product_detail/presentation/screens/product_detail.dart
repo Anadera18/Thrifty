@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
+import '../../../chat/presentation/screens/chat_with_seller_screen.dart';
+
 const _bg = Color(0xFFFBF9FF);
 const _surface = Colors.white;
 const _ink = Color(0xFF111827);
@@ -34,6 +36,26 @@ class ProductDetailsData {
   final IconData icon;
 }
 
+class SavedProductsStore {
+  SavedProductsStore._();
+
+  static final ValueNotifier<List<ProductDetailsData>> items =
+      ValueNotifier<List<ProductDetailsData>>(<ProductDetailsData>[]);
+
+  static bool contains(ProductDetailsData product) =>
+      items.value.any((item) => item.name == product.name);
+
+  static void toggle(ProductDetailsData product) {
+    final next = List<ProductDetailsData>.of(items.value);
+    if (contains(product)) {
+      next.removeWhere((item) => item.name == product.name);
+    } else {
+      next.add(product);
+    }
+    items.value = List.unmodifiable(next);
+  }
+}
+
 class ProductDetailScreen extends StatefulWidget {
   const ProductDetailScreen({
     super.key,
@@ -59,7 +81,13 @@ class ProductDetailScreen extends StatefulWidget {
 }
 
 class _ProductDetailScreenState extends State<ProductDetailScreen> {
-  bool _saved = false;
+  late bool _saved;
+
+  @override
+  void initState() {
+    super.initState();
+    _saved = SavedProductsStore.contains(widget.product);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -80,7 +108,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
             actions: [
               _roundAction(
                 _saved ? Icons.favorite_rounded : Icons.favorite_border_rounded,
-                () => setState(() => _saved = !_saved),
+                _toggleSaved,
                 color: _saved ? const Color(0xFFDC2626) : _teal,
               ),
               const SizedBox(width: 10),
@@ -304,9 +332,9 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
               const SizedBox(width: 10),
               Expanded(
                 child: FilledButton(
-                  onPressed: () => ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Chat with seller is coming soon.'),
+                  onPressed: () => Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => ChatWithSellerScreen(product: product),
                     ),
                   ),
                   style: FilledButton.styleFrom(
@@ -328,6 +356,18 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
               ),
             ],
           ),
+        ),
+      ),
+    );
+  }
+
+  void _toggleSaved() {
+    SavedProductsStore.toggle(widget.product);
+    setState(() => _saved = SavedProductsStore.contains(widget.product));
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          _saved ? 'Saved to your items.' : 'Removed from saved items.',
         ),
       ),
     );
