@@ -23,6 +23,12 @@ class ProductDetailsData {
     required this.placeholderColor,
     required this.iconColor,
     required this.icon,
+    this.imageUrl,
+    this.description,
+    this.sellerName = 'Dinda Putri',
+    this.sellerAvatar = 'DP',
+    this.size = 'L',
+    this.pickupLocation = 'Lowokwaru, Malang',
   });
 
   final String name;
@@ -34,6 +40,12 @@ class ProductDetailsData {
   final Color placeholderColor;
   final Color iconColor;
   final IconData icon;
+  final String? imageUrl;
+  final String? description;
+  final String sellerName;
+  final String sellerAvatar;
+  final String size;
+  final String pickupLocation;
 }
 
 class SavedProductsStore {
@@ -92,13 +104,15 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
   @override
   Widget build(BuildContext context) {
     final product = widget.product;
+    final hasImage = product.imageUrl != null && product.imageUrl!.isNotEmpty;
+
     return Scaffold(
       backgroundColor: _bg,
       body: CustomScrollView(
         slivers: [
           SliverAppBar(
             pinned: true,
-            expandedHeight: 310,
+            expandedHeight: 320,
             backgroundColor: _bg,
             elevation: 0,
             leading: _roundAction(
@@ -117,16 +131,15 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
               background: Stack(
                 fit: StackFit.expand,
                 children: [
-                  ColoredBox(
-                    color: product.placeholderColor,
-                    child: Center(
-                      child: Icon(
-                        product.icon,
-                        size: 112,
-                        color: product.iconColor,
-                      ),
-                    ),
-                  ),
+                  if (hasImage)
+                    Image.network(
+                      product.imageUrl!,
+                      fit: BoxFit.cover,
+                      errorBuilder: (context, error, stackTrace) =>
+                          _fallbackHero(product),
+                    )
+                  else
+                    _fallbackHero(product),
                   Positioned(
                     left: 18,
                     bottom: 18,
@@ -183,7 +196,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                     ],
                   ),
                   const SizedBox(height: 5),
-                  Text(product.name, style: _titleStyle(23)),
+                  Text(product.name, style: _titleStyle(22)),
                   const SizedBox(height: 10),
                   Row(
                     children: [
@@ -206,7 +219,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                           borderRadius: BorderRadius.circular(999),
                         ),
                         child: Text(
-                          'Preloved',
+                          'Preloved • Size ${product.size}',
                           style: GoogleFonts.plusJakartaSans(
                             fontSize: 10,
                             fontWeight: FontWeight.w700,
@@ -222,9 +235,11 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                   _sectionTitle('About this item'),
                   const SizedBox(height: 7),
                   Text(
-                    '${product.name} from ${product.brand}. A carefully selected preloved piece with a clear condition grade, ready for its next owner.',
+                    product.description != null && product.description!.isNotEmpty
+                        ? product.description!
+                        : '${product.name} from ${product.brand}. A carefully curated preloved piece with a verified condition grade, ready for its next owner.',
                     style: GoogleFonts.plusJakartaSans(
-                      fontSize: 12,
+                      fontSize: 13,
                       height: 1.6,
                       color: _muted,
                     ),
@@ -234,7 +249,13 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                     _infoRow(
                       Icons.checkroom_outlined,
                       'Condition',
-                      product.grade.replaceFirst('Grade ', ''),
+                      product.grade,
+                    ),
+                    const Divider(height: 18, color: _line),
+                    _infoRow(
+                      Icons.straighten_outlined,
+                      'Size',
+                      product.size,
                     ),
                     const Divider(height: 18, color: _line),
                     _infoRow(
@@ -245,12 +266,12 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                     const Divider(height: 18, color: _line),
                     _infoRow(
                       Icons.location_on_outlined,
-                      'Distance',
-                      product.distance,
+                      'Pickup point',
+                      product.pickupLocation,
                     ),
                   ]),
                   const SizedBox(height: 16),
-                  _sellerCard(),
+                  _sellerCard(product.sellerName, product.sellerAvatar),
                   const SizedBox(height: 16),
                   Container(
                     padding: const EdgeInsets.all(13),
@@ -270,9 +291,9 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                         const SizedBox(width: 9),
                         Expanded(
                           child: Text(
-                            'Keep your chat and payment on Thrifty. Meet in a public place and check the item before completing your exchange.',
+                            'Keep your chat and payment on Thrifty. Meet in a public place and inspect the item before completing the transaction.',
                             style: GoogleFonts.plusJakartaSans(
-                              fontSize: 10,
+                              fontSize: 11,
                               height: 1.5,
                               color: const Color(0xFF775719),
                             ),
@@ -309,7 +330,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                   onPressed:
                       widget.onAddToCart ??
                       () => ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Added to cart (demo).')),
+                        const SnackBar(content: Text('Added to cart.')),
                       ),
                   icon: const Icon(Icons.add_shopping_cart_rounded, size: 18),
                   label: Text(
@@ -356,6 +377,19 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
               ),
             ],
           ),
+        ),
+      ),
+    );
+  }
+
+  Widget _fallbackHero(ProductDetailsData product) {
+    return ColoredBox(
+      color: product.placeholderColor,
+      child: Center(
+        child: Icon(
+          product.icon,
+          size: 112,
+          color: product.iconColor,
         ),
       ),
     );
@@ -434,7 +468,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
             const SizedBox(width: 7),
             Expanded(
               child: Text(
-                'Thrifty condition grade',
+                'AI Condition Grade',
                 style: GoogleFonts.plusJakartaSans(
                   fontSize: 12,
                   fontWeight: FontWeight.w800,
@@ -451,7 +485,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
               child: Text(
                 grade,
                 style: GoogleFonts.plusJakartaSans(
-                  fontSize: 9,
+                  fontSize: 10,
                   fontWeight: FontWeight.w800,
                   color: Colors.white,
                 ),
@@ -461,9 +495,9 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
         ),
         const SizedBox(height: 8),
         Text(
-          'Review the photos and description with the seller at pickup to confirm the item matches its listing.',
+          'Condition verified based on front, back, and detail photo analysis. Inspect at pickup to confirm.',
           style: GoogleFonts.plusJakartaSans(
-            fontSize: 10,
+            fontSize: 11,
             height: 1.5,
             color: _muted,
           ),
@@ -511,7 +545,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     ],
   );
 
-  Widget _sellerCard() => Container(
+  Widget _sellerCard(String sellerName, String sellerAvatar) => Container(
     padding: const EdgeInsets.all(13),
     decoration: BoxDecoration(
       color: _surface,
@@ -520,12 +554,15 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     ),
     child: Row(
       children: [
-        const CircleAvatar(
+        CircleAvatar(
           radius: 21,
           backgroundColor: _teal,
           child: Text(
-            'DP',
-            style: TextStyle(color: Colors.white, fontWeight: FontWeight.w800),
+            sellerAvatar,
+            style: const TextStyle(
+              color: Colors.white,
+              fontWeight: FontWeight.w800,
+            ),
           ),
         ),
         const SizedBox(width: 10),
@@ -534,9 +571,9 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'Dinda Putri',
+                sellerName,
                 style: GoogleFonts.plusJakartaSans(
-                  fontSize: 12,
+                  fontSize: 13,
                   fontWeight: FontWeight.w800,
                   color: _ink,
                 ),
@@ -544,12 +581,12 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
               const SizedBox(height: 2),
               Text(
                 'Trusted local seller • 4.9 rating',
-                style: GoogleFonts.plusJakartaSans(fontSize: 10, color: _muted),
+                style: GoogleFonts.plusJakartaSans(fontSize: 11, color: _muted),
               ),
             ],
           ),
         ),
-        const Icon(Icons.verified_rounded, color: _green, size: 19),
+        const Icon(Icons.verified_rounded, color: _green, size: 20),
       ],
     ),
   );

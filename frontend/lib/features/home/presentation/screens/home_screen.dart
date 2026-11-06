@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
@@ -9,6 +10,9 @@ import '../../../notifications/presentation/screens/notifications_screen.dart';
 import '../../../product_detail/presentation/screens/product_detail.dart';
 import '../../../profile/presentation/state/account_mode_store.dart';
 import '../../../saved_items/presentation/screens/saved_items_screen.dart';
+import '../../../../core/models/product_model.dart';
+import '../../../../core/services/firestore_product_service.dart';
+import '../../../../core/services/database_seeder.dart';
 import 'filter_screen.dart';
 
 const _background = Color(0xFFFBF9FF);
@@ -29,11 +33,17 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   final _searchController = TextEditingController();
-  final List<_Product> _cart = [];
+  final FirestoreProductService _productService = FirestoreProductService();
+  final List<ProductModel> _cart = [];
+
+  StreamSubscription? _productsSubscription;
+  List<ProductModel> _firestoreProducts = [];
+  bool _isLoading = true;
+
   int _selectedNav = 0;
   double _radius = 5;
   String _activeCategory = 'All';
-  RangeValues _priceRange = const RangeValues(0, 150000);
+  RangeValues _priceRange = const RangeValues(0, 300000);
   String _condition = 'A';
 
   @override
@@ -41,10 +51,42 @@ class _HomeScreenState extends State<HomeScreen> {
     super.initState();
     SavedProductsStore.items.addListener(_refreshSavedProducts);
     AccountModeStore.isSeller.addListener(_refreshAccountMode);
+    _subscribeToFirestoreProducts();
+  }
+
+  void _subscribeToFirestoreProducts() {
+    _productsSubscription = _productService.streamActiveProducts().listen(
+      (snapshot) {
+        if (!mounted) return;
+        if (snapshot.docs.isNotEmpty) {
+          setState(() {
+            _firestoreProducts =
+                snapshot.docs.map(ProductModel.fromFirestore).toList();
+            _isLoading = false;
+          });
+        } else {
+          // If empty, auto-seed and display initial dummy data
+          DatabaseSeeder.seedIfEmpty();
+          setState(() {
+            _firestoreProducts = List.of(DatabaseSeeder.initialDummyProducts);
+            _isLoading = false;
+          });
+        }
+      },
+      onError: (error) {
+        debugPrint('Firestore streaming error: $error');
+        if (!mounted) return;
+        setState(() {
+          _firestoreProducts = List.of(DatabaseSeeder.initialDummyProducts);
+          _isLoading = false;
+        });
+      },
+    );
   }
 
   @override
   void dispose() {
+    _productsSubscription?.cancel();
     SavedProductsStore.items.removeListener(_refreshSavedProducts);
     AccountModeStore.isSeller.removeListener(_refreshAccountMode);
     _searchController.dispose();
@@ -82,41 +124,75 @@ class _HomeScreenState extends State<HomeScreen> {
               padding: const EdgeInsets.fromLTRB(18, 18, 18, 12),
               sliver: SliverToBoxAdapter(child: _buildSectionHeader()),
             ),
-            SliverPadding(
-              padding: const EdgeInsets.symmetric(horizontal: 18),
-              sliver: SliverGrid(
-                delegate: SliverChildBuilderDelegate(
-                  (context, index) => _ProductCard(
-                    product: _visibleProducts[index],
-                    inCart: _cart.contains(_visibleProducts[index]),
-                    onAddToCart: () => _addToCart(_visibleProducts[index]),
-                    onOpen: () => _openProduct(_visibleProducts[index]),
-                    isSaved: SavedProductsStore.contains(
-                      _productDetails(_visibleProducts[index]),
-                    ),
-                    onToggleSaved: () => _toggleSaved(_visibleProducts[index]),
+            if (_isLoading)
+              const SliverToBoxAdapter(
+                child: Padding(
+                  padding: EdgeInsets.all(40),
+                  child: Center(
+                    child: CircularProgressIndicator(color: _darkTeal),
                   ),
-                  childCount: _visibleProducts.length,
                 ),
-                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: 2,
-                  crossAxisSpacing: 12,
-                  mainAxisSpacing: 14,
-                  childAspectRatio: 0.68,
+              )
+            else
+              SliverPadding(
+                padding: const EdgeInsets.symmetric(horizontal: 18),
+                sliver: SliverGrid(
+                  delegate: SliverChildBuilderDelegate(
+                    (context, index) {
+                      final product = _visibleProducts[index];
+                      return _ProductCard(
+                        product: product,
+                        inCart: _cart.any((item) => item.id == product.id),
+                        onAddToCart: () => _addToCart(product),
+                        onOpen: () => _openProduct(product),
+                        isSaved: SavedProductsStore.contains(
+                          _productDetails(product),
+                        ),
+                        onToggleSaved: () => _toggleSaved(product),
+                      );
+                    },
+                    childCount: _visibleProducts.length,
+                  ),
+                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: 2,
+                    crossAxisSpacing: 12,
+                    mainAxisSpacing: 14,
+                    childAspectRatio: 0.68,
+                  ),
                 ),
               ),
-            ),
-            if (_visibleProducts.isEmpty)
+            if (!_isLoading && _visibleProducts.isEmpty)
               SliverToBoxAdapter(
                 child: Padding(
                   padding: const EdgeInsets.all(32),
                   child: Center(
-                    child: Text(
-                      'No items match these filters.',
-                      style: GoogleFonts.plusJakartaSans(
-                        fontSize: 13,
-                        color: _muted,
-                      ),
+                    child: Column(
+                      children: [
+                        const Icon(
+                          Icons.search_off_rounded,
+                          size: 48,
+                          color: _muted,
+                        ),
+                        const SizedBox(height: 12),
+                        Text(
+                          'No preloved items match your filters.',
+                          style: GoogleFonts.plusJakartaSans(
+                            fontSize: 13,
+                            color: _muted,
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        OutlinedButton(
+                          onPressed: () {
+                            setState(() {
+                              _activeCategory = 'All';
+                              _radius = 10;
+                              _searchController.clear();
+                            });
+                          },
+                          child: const Text('Reset filters'),
+                        ),
+                      ],
                     ),
                   ),
                 ),
@@ -126,17 +202,23 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
       ),
       floatingActionButton: AccountModeStore.isSeller.value
-          ? FloatingActionButton(
+          ? FloatingActionButton.extended(
               onPressed: () => Navigator.of(context).push(
                 MaterialPageRoute(builder: (_) => const AddProductScreen()),
               ),
               backgroundColor: _darkTeal,
               foregroundColor: Colors.white,
               elevation: 3,
-              child: const Icon(Icons.add_rounded, size: 28),
+              icon: const Icon(Icons.add_rounded, size: 24),
+              label: Text(
+                'Sell Item',
+                style: GoogleFonts.plusJakartaSans(
+                  fontWeight: FontWeight.w700,
+                  fontSize: 13,
+                ),
+              ),
             )
           : null,
-      floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
       bottomNavigationBar: _buildBottomNavigation(),
     );
   }
@@ -281,7 +363,7 @@ class _HomeScreenState extends State<HomeScreen> {
             onChanged: (_) => setState(() {}),
             style: GoogleFonts.plusJakartaSans(fontSize: 13, color: _ink),
             decoration: InputDecoration(
-              hintText: 'Search preloved items...',
+              hintText: 'Search preloved clothes, brands...',
               hintStyle: GoogleFonts.plusJakartaSans(
                 fontSize: 13,
                 color: _muted,
@@ -345,7 +427,7 @@ class _HomeScreenState extends State<HomeScreen> {
               _softPill('Within ${_radius.round()} km', _cyanSoft),
               const Spacer(),
               Text(
-                'Walking & transit',
+                'Walking & pickup',
                 style: GoogleFonts.plusJakartaSans(
                   fontSize: 10,
                   fontWeight: FontWeight.w600,
@@ -363,9 +445,9 @@ class _HomeScreenState extends State<HomeScreen> {
               trackHeight: 4,
             ),
             child: Slider(
-              value: _radius.clamp(1, 10),
+              value: _radius.clamp(1, 15),
               min: 1,
-              max: 10,
+              max: 15,
               onChanged: (value) => setState(() => _radius = value),
             ),
           ),
@@ -374,7 +456,7 @@ class _HomeScreenState extends State<HomeScreen> {
             children: [
               _caption('1 km'),
               _caption('5 km (Default)'),
-              _caption('10 km'),
+              _caption('15 km'),
             ],
           ),
         ],
@@ -425,14 +507,23 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
         const Spacer(),
         TextButton.icon(
-          onPressed: () => _showLocalMessage('Sorted by nearest items.'),
+          onPressed: () async {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Seeding dummy products to Cloud Firestore...')),
+            );
+            await DatabaseSeeder.seedAll();
+            if (!mounted) return;
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Firestore database populated with sample fashion items!')),
+            );
+          },
           style: TextButton.styleFrom(
             padding: EdgeInsets.zero,
             foregroundColor: _darkTeal,
           ),
-          icon: const Icon(Icons.sort_rounded, size: 16),
+          icon: const Icon(Icons.sync_rounded, size: 16),
           label: Text(
-            'Nearest',
+            'Sync Demo DB',
             style: GoogleFonts.plusJakartaSans(
               fontSize: 11,
               fontWeight: FontWeight.w700,
@@ -447,8 +538,6 @@ class _HomeScreenState extends State<HomeScreen> {
     final isSeller = AccountModeStore.isSeller.value;
     return BottomAppBar(
       color: _surface,
-      shape: isSeller ? const CircularNotchedRectangle() : null,
-      notchMargin: 8,
       child: SizedBox(
         height: 58,
         child: Row(
@@ -456,7 +545,6 @@ class _HomeScreenState extends State<HomeScreen> {
           children: [
             _navItem(Icons.home_outlined, 'Home', 0),
             _navItem(Icons.explore_outlined, 'Explore', 1),
-            if (isSeller) const SizedBox(width: 44),
             _navItem(
               isSeller ? Icons.sell_outlined : Icons.bookmark_outline_rounded,
               isSeller ? 'Listings' : 'Saved',
@@ -528,33 +616,27 @@ class _HomeScreenState extends State<HomeScreen> {
     });
   }
 
-  List<_Product> get _visibleProducts {
+  List<ProductModel> get _visibleProducts {
     final query = _searchController.text.trim().toLowerCase();
-    return _products.where((product) {
-      final matchesQuery =
-          query.isEmpty ||
+    return _firestoreProducts.where((product) {
+      final matchesQuery = query.isEmpty ||
           product.name.toLowerCase().contains(query) ||
           product.brand.toLowerCase().contains(query);
-      final matchesCategory =
-          _activeCategory == 'All' ||
-          switch (_activeCategory) {
-            'Shirt' => product.name.toLowerCase().contains('shirt'),
-            'T-Shirt' => product.name.toLowerCase().contains('tee'),
-            'Pants' => product.name.toLowerCase().contains('pants'),
-            'Jacket' => product.name.toLowerCase().contains('jacket'),
-            _ => true,
-          };
-      final price =
-          int.tryParse(product.price.replaceAll(RegExp(r'[^0-9]'), '')) ?? 0;
+
+      final matchesCategory = _activeCategory == 'All' ||
+          product.category.toLowerCase() == _activeCategory.toLowerCase() ||
+          product.name.toLowerCase().contains(_activeCategory.toLowerCase());
+
       final distance = _distanceInKm(product.distance);
       final grade = product.grade.toUpperCase();
       final matchesCondition = _condition == 'A'
-          ? grade.startsWith('GRADE A')
-          : grade.startsWith('GRADE $_condition');
+          ? (grade.contains('GRADE A') || grade.contains('MINT') || grade.contains('LIKE NEW'))
+          : grade.contains('GRADE $_condition');
+
       return matchesQuery &&
           matchesCategory &&
-          price >= _priceRange.start &&
-          price <= _priceRange.end &&
+          product.price >= _priceRange.start &&
+          product.price <= _priceRange.end &&
           distance <= _radius &&
           matchesCondition;
     }).toList();
@@ -587,7 +669,7 @@ class _HomeScreenState extends State<HomeScreen> {
         .push(MaterialPageRoute(builder: (_) => const MyListingsScreen()));
   }
 
-  void _openProduct(_Product product) {
+  void _openProduct(ProductModel product) {
     Navigator.of(context).push(
       MaterialPageRoute(
         builder: (_) => ProductDetailScreen(
@@ -600,19 +682,25 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  ProductDetailsData _productDetails(_Product product) => ProductDetailsData(
+  ProductDetailsData _productDetails(ProductModel product) => ProductDetailsData(
     name: product.name,
     brand: product.brand,
-    price: product.price,
+    price: product.formattedPrice,
     distance: product.distance,
     rating: product.rating,
     grade: product.grade,
-    placeholderColor: product.placeholderColor,
-    iconColor: product.iconColor,
-    icon: product.icon,
+    imageUrl: product.imageUrls.isNotEmpty ? product.imageUrls.first : null,
+    description: product.description,
+    sellerName: product.sellerName,
+    sellerAvatar: product.sellerAvatar,
+    size: product.size,
+    pickupLocation: product.pickupLocation,
+    placeholderColor: const Color(0xFFD9E8EA),
+    iconColor: const Color(0xFF4F7880),
+    icon: Icons.checkroom_rounded,
   );
 
-  void _toggleSaved(_Product product) {
+  void _toggleSaved(ProductModel product) {
     final details = _productDetails(product);
     SavedProductsStore.toggle(details);
     setState(() {});
@@ -628,8 +716,8 @@ class _HomeScreenState extends State<HomeScreen> {
         .showSnackBar(SnackBar(content: Text(message)));
   }
 
-  void _addToCart(_Product product) {
-    if (_cart.contains(product)) {
+  void _addToCart(ProductModel product) {
+    if (_cart.any((item) => item.id == product.id)) {
       _showLocalMessage('This item is already in your cart.');
       return;
     }
@@ -662,11 +750,7 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  int get _cartTotal => _cart.fold(
-    0,
-    (sum, item) =>
-        sum + (int.tryParse(item.price.replaceAll(RegExp(r'[^0-9]'), '')) ?? 0),
-  );
+  int get _cartTotal => _cart.fold(0, (sum, item) => sum + item.price);
 }
 
 class _ProductCard extends StatelessWidget {
@@ -679,7 +763,7 @@ class _ProductCard extends StatelessWidget {
     required this.onToggleSaved,
   });
 
-  final _Product product;
+  final ProductModel product;
   final VoidCallback onAddToCart;
   final bool inCart;
   final VoidCallback onOpen;
@@ -688,6 +772,8 @@ class _ProductCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final hasImage = product.imageUrls.isNotEmpty;
+
     return GestureDetector(
       onTap: onOpen,
       behavior: HitTestBehavior.opaque,
@@ -706,14 +792,15 @@ class _ProductCard extends StatelessWidget {
               child: Stack(
                 fit: StackFit.expand,
                 children: [
-                  Container(color: product.placeholderColor),
-                  Center(
-                    child: Icon(
-                      product.icon,
-                      size: 44,
-                      color: product.iconColor,
-                    ),
-                  ),
+                  if (hasImage)
+                    Image.network(
+                      product.imageUrls.first,
+                      fit: BoxFit.cover,
+                      errorBuilder: (context, error, stackTrace) =>
+                          _fallbackCover(),
+                    )
+                  else
+                    _fallbackCover(),
                   Positioned(top: 9, left: 9, child: _gradePill(product.grade)),
                   Positioned(
                     top: 7,
@@ -796,9 +883,9 @@ class _ProductCard extends StatelessWidget {
                     Row(
                       children: [
                         Text(
-                          product.price,
+                          product.formattedPrice,
                           style: GoogleFonts.plusJakartaSans(
-                            fontSize: 14,
+                            fontSize: 13,
                             fontWeight: FontWeight.w800,
                             color: _ink,
                           ),
@@ -816,12 +903,28 @@ class _ProductCard extends StatelessWidget {
                       ],
                     ),
                     const SizedBox(height: 5),
-                    _labelPill('Local pickup', const Color(0xFFF1F2F4)),
+                    _labelPill(
+                      'Pickup: ${product.pickupLocation}',
+                      const Color(0xFFF1F2F4),
+                    ),
                   ],
                 ),
               ),
             ),
           ],
+        ),
+      ),
+    );
+  }
+
+  Widget _fallbackCover() {
+    return Container(
+      color: const Color(0xFFD9E8EA),
+      child: const Center(
+        child: Icon(
+          Icons.checkroom_rounded,
+          size: 44,
+          color: Color(0xFF4F7880),
         ),
       ),
     );
@@ -836,6 +939,8 @@ class _ProductCard extends StatelessWidget {
       ),
       child: Text(
         label,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
         style: GoogleFonts.plusJakartaSans(
           fontSize: 9,
           fontWeight: FontWeight.w600,
@@ -889,8 +994,8 @@ class _CartScreen extends StatefulWidget {
     required this.onCheckout,
   });
 
-  final List<_Product> items;
-  final ValueChanged<_Product> onRemove;
+  final List<ProductModel> items;
+  final ValueChanged<ProductModel> onRemove;
   final Future<void> Function() onCheckout;
 
   @override
@@ -898,13 +1003,9 @@ class _CartScreen extends StatefulWidget {
 }
 
 class _CartScreenState extends State<_CartScreen> {
-  late final List<_Product> _items = List.of(widget.items);
+  late final List<ProductModel> _items = List.of(widget.items);
 
-  int get _total => _items.fold(
-    0,
-    (sum, item) =>
-        sum + (int.tryParse(item.price.replaceAll(RegExp(r'[^0-9]'), '')) ?? 0),
-  );
+  int get _total => _items.fold(0, (sum, item) => sum + item.price);
 
   @override
   Widget build(BuildContext context) {
@@ -958,14 +1059,18 @@ class _CartScreenState extends State<_CartScreen> {
                   ),
                   child: Row(
                     children: [
-                      Container(
-                        width: 58,
-                        height: 58,
-                        decoration: BoxDecoration(
-                          color: item.placeholderColor,
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: Icon(item.icon, color: item.iconColor),
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(12),
+                        child: item.imageUrls.isNotEmpty
+                            ? Image.network(
+                                item.imageUrls.first,
+                                width: 58,
+                                height: 58,
+                                fit: BoxFit.cover,
+                                errorBuilder: (context, error, stackTrace) =>
+                                    _cartPlaceholder(),
+                              )
+                            : _cartPlaceholder(),
                       ),
                       const SizedBox(width: 12),
                       Expanded(
@@ -974,6 +1079,8 @@ class _CartScreenState extends State<_CartScreen> {
                           children: [
                             Text(
                               item.name,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
                               style: GoogleFonts.plusJakartaSans(
                                 fontSize: 13,
                                 fontWeight: FontWeight.w700,
@@ -988,7 +1095,7 @@ class _CartScreenState extends State<_CartScreen> {
                               ),
                             ),
                             Text(
-                              item.price,
+                              item.formattedPrice,
                               style: GoogleFonts.plusJakartaSans(
                                 fontSize: 13,
                                 fontWeight: FontWeight.w800,
@@ -1001,8 +1108,9 @@ class _CartScreenState extends State<_CartScreen> {
                       IconButton(
                         tooltip: 'Remove from cart',
                         onPressed: () {
-                          setState(() => _items.removeAt(index));
-                          widget.onRemove(item);
+                          final removed = _items.removeAt(index);
+                          setState(() {});
+                          widget.onRemove(removed);
                         },
                         icon: const Icon(
                           Icons.delete_outline_rounded,
@@ -1037,7 +1145,7 @@ class _CartScreenState extends State<_CartScreen> {
                         ),
                         const Spacer(),
                         Text(
-                          'Rp ${_total.toString()}',
+                          'Rp $_total',
                           style: GoogleFonts.plusJakartaSans(
                             fontSize: 16,
                             fontWeight: FontWeight.w800,
@@ -1065,99 +1173,15 @@ class _CartScreenState extends State<_CartScreen> {
             ),
     );
   }
+
+  Widget _cartPlaceholder() {
+    return Container(
+      width: 58,
+      height: 58,
+      color: const Color(0xFFD9E8EA),
+      child: const Icon(Icons.checkroom_rounded, color: Color(0xFF4F7880)),
+    );
+  }
 }
 
 const _tealText = Color(0xFF0E7490);
-
-class _Product {
-  const _Product({
-    required this.name,
-    required this.brand,
-    required this.price,
-    required this.distance,
-    required this.rating,
-    required this.grade,
-    required this.placeholderColor,
-    required this.iconColor,
-    required this.icon,
-  });
-
-  final String name;
-  final String brand;
-  final String price;
-  final String distance;
-  final String rating;
-  final String grade;
-  final Color placeholderColor;
-  final Color iconColor;
-  final IconData icon;
-}
-
-const _products = [
-  _Product(
-    name: 'Washed Denim Jacket',
-    brand: 'Vintage Levi’s',
-    price: 'Rp 145.000',
-    distance: '800 m',
-    rating: '4.9',
-    grade: 'Grade A+ • Mint',
-    placeholderColor: Color(0xFFD9E8EA),
-    iconColor: Color(0xFF4F7880),
-    icon: Icons.checkroom_rounded,
-  ),
-  _Product(
-    name: 'Heavyweight Boxy Tee',
-    brand: 'Uniqlo U',
-    price: 'Rp 89.000',
-    distance: '1.2 km',
-    rating: '4.8',
-    grade: 'Grade A • Like New',
-    placeholderColor: Color(0xFFE9E1D4),
-    iconColor: Color(0xFF947D62),
-    icon: Icons.dry_cleaning_outlined,
-  ),
-  _Product(
-    name: 'Pied Wide Leg Pants',
-    brand: 'Dickies 874',
-    price: 'Rp 120.000',
-    distance: '2.4 km',
-    rating: '4.7',
-    grade: 'Grade B • Good',
-    placeholderColor: Color(0xFFDCE0CC),
-    iconColor: Color(0xFF7B8660),
-    icon: Icons.airline_seat_legroom_extra_rounded,
-  ),
-  _Product(
-    name: 'Corduroy Detroit Jacket',
-    brand: 'Carhartt WIP',
-    price: 'Rp 210.000',
-    distance: '3.1 km',
-    rating: '5.0',
-    grade: 'Grade A • Like New',
-    placeholderColor: Color(0xFFD8E1D8),
-    iconColor: Color(0xFF50715D),
-    icon: Icons.shopping_bag_outlined,
-  ),
-  _Product(
-    name: 'Flannel Check Shirt',
-    brand: 'Polo Ralph Lauren',
-    price: 'Rp 175.000',
-    distance: '3.8 km',
-    rating: '4.9',
-    grade: 'Grade A+ • Mint',
-    placeholderColor: Color(0xFFE2D9D1),
-    iconColor: Color(0xFF8B6555),
-    icon: Icons.grid_4x4_rounded,
-  ),
-  _Product(
-    name: 'Faded World Tour Tee',
-    brand: 'Stüssy Archive',
-    price: 'Rp 95.000',
-    distance: '4.1 km',
-    rating: '4.6',
-    grade: 'Grade B • Very Good',
-    placeholderColor: Color(0xFFD9DDE2),
-    iconColor: Color(0xFF647486),
-    icon: Icons.photo_size_select_actual_outlined,
-  ),
-];
