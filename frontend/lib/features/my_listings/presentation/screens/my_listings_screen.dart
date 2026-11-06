@@ -1,14 +1,17 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../../home/presentation/screens/home_screen.dart';
+import '../../../add_product/presentation/screens/add_product_screen.dart';
+import '../../../../core/models/product_model.dart';
+import '../../../../core/services/firestore_product_service.dart';
 
 const _bg = Color(0xFFFBF9FF);
 const _surface = Colors.white;
 const _ink = Color(0xFF111827);
 const _muted = Color(0xFF5B6270);
 const _darkTeal = Color(0xFF0E3436);
-const _cyanSoft = Color(0xFFCFF5FA);
 const _line = Color(0xFFE5E3EF);
 
 class MyListingsScreen extends StatefulWidget {
@@ -19,45 +22,58 @@ class MyListingsScreen extends StatefulWidget {
 }
 
 class _MyListingsScreenState extends State<MyListingsScreen> {
-  int _selectedTab = 0;
-  final _items = <_Listing>[
-    const _Listing(
-      category: 'OUTERWEAR',
-      name: 'Vintage Denim Jacket',
-      detail: 'Jacket • Size L (Oversized)',
-      price: 'Rp 89.000',
-      views: '42',
-      age: 'Listed 2d ago',
-      color: Color(0xFFD9E8EA),
-      icon: Icons.checkroom_rounded,
-      grade: 'Grade A',
-    ),
-    const _Listing(
-      category: 'STREETWEAR',
-      name: 'Urban Nomad Graphic Tee',
-      detail: 'T-Shirt • Size M • Charcoal',
-      price: 'Rp 65.000',
-      views: '29',
-      age: 'Listed 4d ago',
-      color: Color(0xFFE5DDD5),
-      icon: Icons.dry_cleaning_outlined,
-      grade: 'Grade B • Very Good',
-    ),
-    const _Listing(
-      category: 'TROUSERS',
-      name: 'Washed Corduroy Trousers',
-      detail: 'Pants • Waist 32 • Warm Brown',
-      price: 'Rp 170.000',
-      views: '13',
-      age: 'Listed 5d ago',
-      color: Color(0xFFDCE0CC),
-      icon: Icons.airline_seat_legroom_extra_rounded,
-      grade: 'Archival',
-    ),
-  ];
+  final FirestoreProductService _productService = FirestoreProductService();
+  StreamSubscription? _listingsSub;
+  List<ProductModel> _items = [];
+  bool _isLoading = true;
+  int _selectedTab = 0; // 0: Active, 1: Sold, 2: Drafts
+
+  @override
+  void initState() {
+    super.initState();
+    _subscribeListings();
+  }
+
+  void _subscribeListings() {
+    _listingsSub = _productService.streamActiveProducts().listen(
+      (snapshot) {
+        if (!mounted) return;
+        setState(() {
+          _items = snapshot.docs.map(ProductModel.fromFirestore).toList();
+          _isLoading = false;
+        });
+      },
+      onError: (err) {
+        debugPrint('MyListings stream error: $err');
+        if (!mounted) return;
+        setState(() => _isLoading = false);
+      },
+    );
+  }
+
+  @override
+  void dispose() {
+    _listingsSub?.cancel();
+    super.dispose();
+  }
+
+  List<ProductModel> get _filteredItems {
+    if (_selectedTab == 1) {
+      return _items.where((i) => i.status == 'sold').toList();
+    } else if (_selectedTab == 2) {
+      return _items.where((i) => i.status == 'draft').toList();
+    }
+    return _items.where((i) => i.status == 'active').toList();
+  }
+
+  int get _totalActiveValue =>
+      _items.where((i) => i.status == 'active').fold(0, (sum, i) => sum + i.price);
 
   @override
   Widget build(BuildContext context) {
+    final activeCount = _items.where((i) => i.status == 'active').length;
+    final soldCount = _items.where((i) => i.status == 'sold').length;
+
     return Scaffold(
       backgroundColor: _bg,
       appBar: AppBar(
@@ -81,38 +97,67 @@ class _MyListingsScreenState extends State<MyListingsScreen> {
             onPressed: () => _goHome(),
             icon: const Icon(Icons.home_outlined, color: _ink),
           ),
-          IconButton(
-            onPressed: () => _showMessage('Listing filters are ready.'),
-            icon: const Icon(Icons.tune_rounded, color: _darkTeal),
-          ),
         ],
       ),
       body: ListView(
         padding: const EdgeInsets.fromLTRB(18, 4, 18, 24),
         children: [
           Text(
-            'Manage your wardrobe archive',
-            style: GoogleFonts.plusJakartaSans(fontSize: 14, color: _muted),
+            'Manage your wardrobe archive on Cloud Firestore',
+            style: GoogleFonts.plusJakartaSans(fontSize: 13, color: _muted),
           ),
           const SizedBox(height: 18),
-          _buildTabs(),
+          _buildTabs(activeCount, soldCount),
           const SizedBox(height: 14),
           _buildSnapshot(),
           const SizedBox(height: 16),
-          ..._items.map(
-            (item) => Padding(
-              padding: const EdgeInsets.only(bottom: 12),
-              child: _ListingCard(
-                listing: item,
-                onEdit: () => _showMessage('Edit listing is ready.'),
-                onDelete: () => _deleteListing(item),
+          if (_isLoading)
+            const Padding(
+              padding: EdgeInsets.all(40),
+              child: Center(
+                child: CircularProgressIndicator(color: _darkTeal),
+              ),
+            )
+          else if (_filteredItems.isEmpty)
+            Padding(
+              padding: const EdgeInsets.all(32),
+              child: Center(
+                child: Column(
+                  children: [
+                    const Icon(
+                      Icons.inventory_2_outlined,
+                      size: 44,
+                      color: _muted,
+                    ),
+                    const SizedBox(height: 10),
+                    Text(
+                      _selectedTab == 0
+                          ? 'No active listings in database yet.'
+                          : 'No items in this tab.',
+                      style: GoogleFonts.plusJakartaSans(
+                        fontSize: 13,
+                        color: _muted,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            )
+          else
+            ..._filteredItems.map(
+              (item) => Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: _ListingCard(
+                  listing: item,
+                  onDelete: () => _deleteListing(item),
+                  onToggleSold: () => _toggleSoldStatus(item),
+                ),
               ),
             ),
-          ),
         ],
       ),
       floatingActionButton: FloatingActionButton.extended(
-        onPressed: _createListing,
+        onPressed: _openAddProduct,
         backgroundColor: _darkTeal,
         foregroundColor: Colors.white,
         icon: const Icon(Icons.add_rounded),
@@ -124,8 +169,8 @@ class _MyListingsScreenState extends State<MyListingsScreen> {
     );
   }
 
-  Widget _buildTabs() {
-    const labels = ['Active 3', 'Sold 14', 'Drafts'];
+  Widget _buildTabs(int activeCount, int soldCount) {
+    final labels = ['Active $activeCount', 'Sold $soldCount', 'Drafts'];
     return Container(
       padding: const EdgeInsets.all(4),
       decoration: BoxDecoration(
@@ -177,7 +222,7 @@ class _MyListingsScreenState extends State<MyListingsScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'WEEKLY SNAPSHOT',
+                  'ACTIVE WARDROBE VALUE',
                   style: GoogleFonts.plusJakartaSans(
                     fontSize: 10,
                     fontWeight: FontWeight.w800,
@@ -187,7 +232,7 @@ class _MyListingsScreenState extends State<MyListingsScreen> {
                 ),
                 const SizedBox(height: 6),
                 Text(
-                  'Rp 324.000',
+                  'Rp $_totalActiveValue',
                   style: GoogleFonts.plusJakartaSans(
                     fontSize: 22,
                     fontWeight: FontWeight.w800,
@@ -195,7 +240,7 @@ class _MyListingsScreenState extends State<MyListingsScreen> {
                   ),
                 ),
                 Text(
-                  '84 views captured this week',
+                  '${_items.length} items cataloged in Firestore',
                   style: GoogleFonts.plusJakartaSans(
                     fontSize: 12,
                     color: _muted,
@@ -205,9 +250,9 @@ class _MyListingsScreenState extends State<MyListingsScreen> {
             ),
           ),
           ElevatedButton.icon(
-            onPressed: _createListing,
+            onPressed: _openAddProduct,
             icon: const Icon(Icons.add_rounded, size: 18),
-            label: const Text('Drop'),
+            label: const Text('Add'),
             style: ElevatedButton.styleFrom(
               backgroundColor: _darkTeal,
               foregroundColor: Colors.white,
@@ -222,235 +267,203 @@ class _MyListingsScreenState extends State<MyListingsScreen> {
     );
   }
 
-  void _deleteListing(_Listing listing) {
-    setState(() => _items.remove(listing));
-    _showMessage('${listing.name} removed from your listings.');
+  Future<void> _openAddProduct() async {
+    await Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => const AddProductScreen()),
+    );
   }
 
-  Future<void> _createListing() async {
-    final titleController = TextEditingController();
-    final priceController = TextEditingController();
-    final formKey = GlobalKey<FormState>();
-    final shouldSave = await showDialog<bool>(
+  Future<void> _deleteListing(ProductModel listing) async {
+    final confirm = await showDialog<bool>(
       context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: const Text('New listing'),
-        content: Form(
-          key: formKey,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextFormField(
-                controller: titleController,
-                autofocus: true,
-                decoration: const InputDecoration(labelText: 'Item name'),
-                validator: (value) => value == null || value.trim().isEmpty
-                    ? 'Enter an item name'
-                    : null,
-              ),
-              TextFormField(
-                controller: priceController,
-                keyboardType: TextInputType.number,
-                decoration: const InputDecoration(labelText: 'Price (IDR)'),
-                validator: (value) {
-                  final price = int.tryParse(value?.replaceAll('.', '') ?? '');
-                  return price == null || price <= 0
-                      ? 'Enter a valid price'
-                      : null;
-                },
-              ),
-            ],
-          ),
-        ),
+      builder: (ctx) => AlertDialog(
+        title: const Text('Delete Listing?'),
+        content: Text('Remove "${listing.name}" permanently from Firestore?'),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(dialogContext, false),
+            onPressed: () => Navigator.pop(ctx, false),
             child: const Text('Cancel'),
           ),
-          FilledButton(
-            onPressed: () {
-              if (formKey.currentState?.validate() ?? false) {
-                Navigator.pop(dialogContext, true);
-              }
-            },
-            child: const Text('Add item'),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+            child: const Text('Delete', style: TextStyle(color: Colors.white)),
           ),
         ],
       ),
     );
 
-    if (shouldSave == true && mounted) {
-      final price = int.parse(priceController.text.replaceAll('.', ''));
-      setState(() {
-        _selectedTab = 0;
-        _items.insert(
-          0,
-          _Listing(
-            category: 'NEW ARRIVAL',
-            name: titleController.text.trim(),
-            detail: 'Preloved item • Condition not graded',
-            price: 'Rp ${price.toString()}',
-            views: '0',
-            age: 'Listed just now',
-            color: const Color(0xFFD9E8EA),
-            icon: Icons.checkroom_rounded,
-            grade: 'Pending grade',
-          ),
-        );
-      });
-      _showMessage('Listing added to your active items.');
+    if (confirm != true) return;
+
+    try {
+      await _productService.deleteProduct(listing.id);
+      _showMessage('${listing.name} deleted from Firestore.');
+    } catch (e) {
+      _showMessage('Error deleting listing: $e');
     }
-    titleController.dispose();
-    priceController.dispose();
   }
 
-  void _showMessage(String message) {
-    ScaffoldMessenger.of(context)
-        .showSnackBar(SnackBar(content: Text(message)));
+  Future<void> _toggleSoldStatus(ProductModel listing) async {
+    final nextStatus = listing.status == 'sold' ? 'active' : 'sold';
+    try {
+      await _productService.updateProduct(listing.id, {'status': nextStatus});
+      _showMessage(
+        nextStatus == 'sold'
+            ? 'Marked as Sold!'
+            : 'Relisted as Active item.',
+      );
+    } catch (e) {
+      _showMessage('Failed to update status: $e');
+    }
   }
 
   void _goHome() {
-    final navigator = Navigator.of(context);
-    if (navigator.canPop()) {
-      navigator.popUntil((route) => route.isFirst);
-    } else {
-      navigator.pushReplacement(
-        MaterialPageRoute(builder: (_) => const HomeScreen()),
-      );
-    }
+    Navigator.of(context).pushAndRemoveUntil(
+      MaterialPageRoute(builder: (_) => const HomeScreen()),
+      (route) => false,
+    );
+  }
+
+  void _showMessage(String text) {
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(text)));
   }
 }
 
 class _ListingCard extends StatelessWidget {
   const _ListingCard({
     required this.listing,
-    required this.onEdit,
     required this.onDelete,
+    required this.onToggleSold,
   });
 
-  final _Listing listing;
-  final VoidCallback onEdit;
+  final ProductModel listing;
   final VoidCallback onDelete;
+  final VoidCallback onToggleSold;
 
   @override
   Widget build(BuildContext context) {
+    final hasImage = listing.imageUrls.isNotEmpty;
+    final isSold = listing.status == 'sold';
+
     return Container(
-      padding: const EdgeInsets.all(10),
+      padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         color: _surface,
         borderRadius: BorderRadius.circular(18),
         border: Border.all(color: _line),
       ),
-      child: Column(
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Container(
-                width: 104,
-                height: 120,
-                decoration: BoxDecoration(
-                  color: listing.color,
-                  borderRadius: BorderRadius.circular(14),
-                ),
-                child: Icon(listing.icon, size: 48, color: _darkTeal),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: SizedBox(
-                  height: 120,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          Text(
-                            listing.category,
-                            style: GoogleFonts.plusJakartaSans(
-                              fontSize: 10,
-                              fontWeight: FontWeight.w800,
-                              color: _muted,
-                              letterSpacing: 0.5,
-                            ),
-                          ),
-                          const Spacer(),
-                          _gradePill(listing.grade),
-                        ],
+          ClipRRect(
+            borderRadius: BorderRadius.circular(14),
+            child: SizedBox(
+              width: 72,
+              height: 72,
+              child: hasImage
+                  ? Image.network(
+                      listing.imageUrls.first,
+                      fit: BoxFit.cover,
+                      errorBuilder: (context, error, stackTrace) =>
+                          _fallbackCover(),
+                    )
+                  : _fallbackCover(),
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Text(
+                      listing.category.toUpperCase(),
+                      style: GoogleFonts.plusJakartaSans(
+                        fontSize: 9,
+                        fontWeight: FontWeight.w800,
+                        color: _darkTeal,
+                        letterSpacing: 0.5,
                       ),
-                      const SizedBox(height: 7),
-                      Text(
-                        listing.name,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
+                    ),
+                    const Spacer(),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 3,
+                      ),
+                      decoration: BoxDecoration(
+                        color: isSold
+                            ? const Color(0xFFF3F4F6)
+                            : const Color(0xFFCFF5FA),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Text(
+                        isSold ? 'SOLD' : listing.grade,
                         style: GoogleFonts.plusJakartaSans(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w800,
-                          color: _ink,
+                          fontSize: 9,
+                          fontWeight: FontWeight.w700,
+                          color: isSold ? Colors.grey.shade700 : _darkTeal,
                         ),
                       ),
-                      const SizedBox(height: 3),
-                      Text(
-                        listing.detail,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  listing.name,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: GoogleFonts.plusJakartaSans(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w800,
+                    color: _ink,
+                  ),
+                ),
+                Text(
+                  '${listing.brand} • Size ${listing.size}',
+                  style: GoogleFonts.plusJakartaSans(
+                    fontSize: 11,
+                    color: _muted,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    Text(
+                      listing.formattedPrice,
+                      style: GoogleFonts.plusJakartaSans(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w800,
+                        color: _ink,
+                      ),
+                    ),
+                    const Spacer(),
+                    TextButton(
+                      onPressed: onToggleSold,
+                      style: TextButton.styleFrom(
+                        visualDensity: VisualDensity.compact,
+                        padding: const EdgeInsets.symmetric(horizontal: 8),
+                      ),
+                      child: Text(
+                        isSold ? 'Relist' : 'Mark Sold',
                         style: GoogleFonts.plusJakartaSans(
                           fontSize: 11,
-                          color: _muted,
+                          fontWeight: FontWeight.w700,
                         ),
                       ),
-                      const Spacer(),
-                      Row(
-                        children: [
-                          Text(
-                            listing.price,
-                            style: GoogleFonts.plusJakartaSans(
-                              fontSize: 17,
-                              fontWeight: FontWeight.w800,
-                              color: _ink,
-                            ),
-                          ),
-                          const Spacer(),
-                          const Icon(
-                            Icons.visibility_outlined,
-                            size: 15,
-                            color: _muted,
-                          ),
-                          const SizedBox(width: 3),
-                          Text(listing.views, style: _captionStyle()),
-                        ],
+                    ),
+                    IconButton(
+                      tooltip: 'Delete listing',
+                      onPressed: onDelete,
+                      visualDensity: VisualDensity.compact,
+                      icon: const Icon(
+                        Icons.delete_outline_rounded,
+                        size: 19,
+                        color: Color(0xFFDC2626),
                       ),
-                    ],
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 10),
-          Container(
-            padding: const EdgeInsets.fromLTRB(10, 8, 4, 8),
-            decoration: BoxDecoration(
-              color: const Color(0xFFF5F6F8),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Row(
-              children: [
-                Text(listing.age, style: _captionStyle()),
-                const Spacer(),
-                TextButton.icon(
-                  onPressed: onEdit,
-                  icon: const Icon(Icons.edit_outlined, size: 16),
-                  label: const Text('Edit'),
-                  style: TextButton.styleFrom(
-                    foregroundColor: _darkTeal,
-                    backgroundColor: Colors.white,
-                  ),
-                ),
-                IconButton(
-                  onPressed: onDelete,
-                  icon: const Icon(
-                    Icons.delete_outline_rounded,
-                    color: Color(0xFFB91C1C),
-                  ),
+                    ),
+                  ],
                 ),
               ],
             ),
@@ -460,48 +473,16 @@ class _ListingCard extends StatelessWidget {
     );
   }
 
-  Widget _gradePill(String label) {
+  Widget _fallbackCover() {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 4),
-      decoration: BoxDecoration(
-        color: _cyanSoft,
-        borderRadius: BorderRadius.circular(999),
-      ),
-      child: Text(
-        label,
-        style: GoogleFonts.plusJakartaSans(
-          fontSize: 9,
-          fontWeight: FontWeight.w700,
-          color: _darkTeal,
+      color: const Color(0xFFD9E8EA),
+      child: const Center(
+        child: Icon(
+          Icons.checkroom_rounded,
+          size: 32,
+          color: Color(0xFF4F7880),
         ),
       ),
     );
   }
-
-  TextStyle _captionStyle() =>
-      GoogleFonts.plusJakartaSans(fontSize: 11, color: _muted);
-}
-
-class _Listing {
-  const _Listing({
-    required this.category,
-    required this.name,
-    required this.detail,
-    required this.price,
-    required this.views,
-    required this.age,
-    required this.color,
-    required this.icon,
-    required this.grade,
-  });
-
-  final String category;
-  final String name;
-  final String detail;
-  final String price;
-  final String views;
-  final String age;
-  final Color color;
-  final IconData icon;
-  final String grade;
 }
