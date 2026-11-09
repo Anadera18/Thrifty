@@ -45,6 +45,7 @@ dependencies:
   firebase_auth: ^7.0.1
   cloud_firestore: ^7.1.0
   firebase_storage: ^14.0.1
+  http: ^1.6.0
 
 dev_dependencies:
   flutter_test:
@@ -69,6 +70,7 @@ flutter:
   uses-material-design: true
   assets:
     - assets/images/
+    - assets/images/drive_samples/
 
   # To add assets to your application, add an assets section, like this:
   # assets:

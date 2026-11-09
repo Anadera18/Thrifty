@@ -151,6 +151,7 @@ class _MyListingsScreenState extends State<MyListingsScreen> {
                   listing: item,
                   onDelete: () => _deleteListing(item),
                   onToggleSold: () => _toggleSoldStatus(item),
+                  onEdit: () => _editListing(item),
                 ),
               ),
             ),
@@ -317,6 +318,91 @@ class _MyListingsScreenState extends State<MyListingsScreen> {
     }
   }
 
+  Future<void> _editListing(ProductModel listing) async {
+    final nameCtrl = TextEditingController(text: listing.name);
+    final priceCtrl = TextEditingController(text: listing.price.toString());
+    final brandCtrl = TextEditingController(text: listing.brand);
+    String selectedGrade = listing.grade;
+
+    final updated = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (context, setDlgState) => AlertDialog(
+          title: Text(
+            'Edit Listing',
+            style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.bold),
+          ),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextField(
+                  controller: nameCtrl,
+                  decoration: const InputDecoration(labelText: 'Item Name'),
+                ),
+                TextField(
+                  controller: brandCtrl,
+                  decoration: const InputDecoration(labelText: 'Brand'),
+                ),
+                TextField(
+                  controller: priceCtrl,
+                  keyboardType: TextInputType.number,
+                  decoration: const InputDecoration(labelText: 'Price (Rp)'),
+                ),
+                const SizedBox(height: 12),
+                DropdownButtonFormField<String>(
+                  initialValue: ['Grade A · Like new', 'Grade B · Very good', 'Grade C · Good / Usable', 'Grade D · Significant wear', 'Grade A', 'Grade B', 'Grade C', 'Grade D']
+                          .contains(selectedGrade)
+                      ? selectedGrade
+                      : 'Grade A · Like new',
+                  decoration: const InputDecoration(labelText: 'Condition Grade'),
+                  items: const [
+                    DropdownMenuItem(value: 'Grade A · Like new', child: Text('Grade A · Like new')),
+                    DropdownMenuItem(value: 'Grade B · Very good', child: Text('Grade B · Very good')),
+                    DropdownMenuItem(value: 'Grade C · Good / Usable', child: Text('Grade C · Good / Usable')),
+                    DropdownMenuItem(value: 'Grade D · Significant wear', child: Text('Grade D · Significant wear')),
+                  ],
+                  onChanged: (val) {
+                    if (val != null) setDlgState(() => selectedGrade = val);
+                  },
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: _darkTeal,
+                foregroundColor: Colors.white,
+              ),
+              child: const Text('Save'),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    if (updated != true) return;
+
+    try {
+      final newPrice = int.tryParse(priceCtrl.text.replaceAll(RegExp(r'[^0-9]'), '')) ?? listing.price;
+      await _productService.updateProduct(listing.id, {
+        'name': nameCtrl.text.trim(),
+        'brand': brandCtrl.text.trim(),
+        'price': newPrice,
+        'grade': selectedGrade,
+      });
+      _showMessage('Listing updated successfully!');
+    } catch (e) {
+      _showMessage('Failed to update listing: ');
+    }
+  }
+
   void _goHome() {
     Navigator.of(context).pushAndRemoveUntil(
       MaterialPageRoute(builder: (_) => const HomeScreen()),
@@ -334,11 +420,13 @@ class _ListingCard extends StatelessWidget {
     required this.listing,
     required this.onDelete,
     required this.onToggleSold,
+    required this.onEdit,
   });
 
   final ProductModel listing;
   final VoidCallback onDelete;
   final VoidCallback onToggleSold;
+  final VoidCallback onEdit;
 
   @override
   Widget build(BuildContext context) {
@@ -451,6 +539,16 @@ class _ListingCard extends StatelessWidget {
                           fontSize: 11,
                           fontWeight: FontWeight.w700,
                         ),
+                      ),
+                    ),
+                    IconButton(
+                      tooltip: 'Edit listing',
+                      onPressed: onEdit,
+                      visualDensity: VisualDensity.compact,
+                      icon: const Icon(
+                        Icons.edit_outlined,
+                        size: 19,
+                        color: _darkTeal,
                       ),
                     ),
                     IconButton(

@@ -125,7 +125,7 @@ class _AddProductScreenState extends State<AddProductScreen> {
       return;
     }
 
-    final result = await Navigator.of(context).push<String>(
+    final result = await Navigator.of(context).push<dynamic>(
       MaterialPageRoute(
         builder: (_) => AiGradingResultScreen(
           imageBytes: List<Uint8List>.unmodifiable(_photos),
@@ -136,7 +136,15 @@ class _AddProductScreenState extends State<AddProductScreen> {
 
     if (!mounted || result == null) return;
     setState(() {
-      _grade = result;
+      if (result is Map) {
+        _grade = result['grade'] as String? ?? _grade;
+        if (result['category'] != null &&
+            (result['category'] as String).isNotEmpty) {
+          _selectedCategory = result['category'] as String;
+        }
+      } else if (result is String) {
+        _grade = result;
+      }
       _currentStep = 3; // Advance to Step 3: Details & Publish
     });
   }
@@ -467,9 +475,9 @@ class _AddProductScreenState extends State<AddProductScreen> {
                 borderRadius: BorderRadius.circular(14),
               ),
             ),
-            icon: const Icon(Icons.arrow_forward_rounded, size: 18),
+            icon: const Icon(Icons.auto_awesome_rounded, size: 18, color: Colors.amberAccent),
             label: Text(
-              'Continue to Condition Review',
+              'Continue to AI Condition Review',
               style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w700),
             ),
           ),

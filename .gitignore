@@ -7,8 +7,14 @@ backend/uploads/*
 ml/.venv/
 ml/data/raw/*
 ml/data/processed/*
+ml/data/drive_download/*
+!ml/data/drive_download/.gitkeep
+frontend/android/build/
 ml/models/*
 !ml/**/.gitkeep
+!ml/models/metadata.json
+!ml/models/thrifty_model.keras
+!ml/models/thrifty_model.tflite
 .idea/
 .vscode/
 .DS_Store

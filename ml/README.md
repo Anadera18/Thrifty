@@ -1,0 +1,82 @@
+# Thrifty — AI Condition Grading & Classification Workspace
+
+Workspace Machine Learning untuk aplikasi **Thrifty (Location-Based Secondhand Fashion Marketplace with AI-Powered Clothing Condition Grading)**.
+
+---
+
+## 🎯 Ringkasan & Spesifikasi Model
+
+Sesuai dengan Proposal Proyek PBL Semester 5:
+- **Tugas AI/ML:**
+  1. **Klasifikasi Kategori Pakaian:** 4 Kategori (`Shirt`, `T-Shirt`, `Pants`, `Jacket`).
+  2. **Grading Kondisi Pakaian:** 4 Tingkatan Kondisi (`Grade A`, `Grade B`, `Grade C`, `Grade D`).
+- **Arsitektur:** **MobileNetV2** Pretrained ImageNet (Dual-Head Multi-Task Transfer Learning).
+- **Target Proposal:** Akurasi minimal $\ge 80\%$.
+- **Hasil Pengujian Aktual (Test Set):**
+  - **Akurasi Klasifikasi Kategori:** **100.00%**
+  - **Akurasi Grading Kondisi Pakaian:** **84.38%** (Melampaui target 80%)
+  - **Macro F1-Score:** **83.14%**
+
+---
+
+## 📁 Struktur Direktori `ml/`
+
+```
+ml/
+├── data/
+│   └── processed/          # Dataset split 80% train, 10% val, 10% test
+├── models/
+│   ├── metadata.json       # Metadata label, target kelas, & skor akurasi
+│   ├── thrifty_model.keras # Model TensorFlow/Keras 3 hasil training
+│   └── thrifty_model.tflite# Model TFLite teroptimasi untuk mobile (2.6 MB)
+├── notebooks/
+│   └── thrifty_ai_grading_classification.ipynb  # Jupyter Notebook untuk demo akademik PBL
+├── reports/
+│   ├── confusion_matrix.png     # Visualisasi Confusion Matrix Kategori & Grade
+│   ├── training_curves.png      # Grafik loss & akurasi per epoch
+│   └── evaluation_report.json   # Precision, Recall, F1 lengkap per kelas
+├── service/
+│   └── app.py              # REST API Microservice (FastAPI + Uvicorn)
+├── training/
+│   ├── dataset_generator.py# Generator dataset terstruktur
+│   └── train.py            # Pipeline training & evaluasi MobileNetV2
+├── requirements.txt        # Dependensi Python
+├── run_ml_service.bat      # 1-Click launcher untuk Windows Command Prompt
+└── run_ml_service.ps1      # 1-Click launcher untuk PowerShell
+```
+
+---
+
+## 🚀 Cara Menjalankan ML Microservice (FastAPI)
+
+### 1. Jalankan via 1-Click Script
+Klik dua kali file:
+```cmd
+ml/run_ml_service.bat
+```
+Atau jalankan via PowerShell:
+```powershell
+.\ml\run_ml_service.ps1
+```
+
+### 2. Jalankan Manual via Terminal
+```powershell
+python -m uvicorn ml.service.app:app --host 0.0.0.0 --port 8000 --reload
+```
+
+- API Base URL: `http://localhost:8000`
+- Dokumentasi Interaktif (Swagger UI): `http://localhost:8000/docs`
+- Endpoint Prediksi: `POST /predict` (menerima file gambar / multipart atau base64)
+
+---
+
+## 📱 Integrasi Flutter Frontend
+
+Aplikasi Flutter di `frontend/` sudah terhubung langsung:
+- **`AiGradingService` (`frontend/lib/core/services/ai_grading_service.dart`)**:
+  - Otomatis menghubungi microservice ML di `http://10.0.2.2:8000` (Android emulator) atau `http://localhost:8000` (Web).
+  - **Smart On-Device Heuristic Fallback:** Jika microservice sedang offline, aplikasi tetap berjalan 100% mulus dengan analisis visual real-time di perangkat.
+- **`AiGradingResultScreen` (`frontend/lib/features/ai_grading/presentation/screens/ai_grading_result_screen.dart`)**:
+  - Animasi laser scanner visual.
+  - Kartu hasil AI: Prediksi Kategori, Prediksi Grade (A–D), Quality Score (0–100), Breakdown (Fabric Smoothness, Color Vibrancy, Stitches & Seams), dan rekomendasi AI.
+  - Penjual dapat langsung konfirmasi rekomendasi AI atau memilih opsi grading manual.
