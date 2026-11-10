@@ -39,7 +39,7 @@ class SavedItemsScreen extends StatelessWidget {
           return ListView.separated(
             padding: const EdgeInsets.fromLTRB(18, 8, 18, 24),
             itemCount: products.length,
-            separatorBuilder: (_, _) => const SizedBox(height: 10),
+            separatorBuilder: (_, __) => const SizedBox(height: 10),
             itemBuilder: (context, index) =>
                 _savedCard(context, products[index]),
           );
