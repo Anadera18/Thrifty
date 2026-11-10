@@ -37,3 +37,20 @@ npm install
 npm start
 ```
 *(Backend berjalan di port 5000: `http://localhost:5000/api/v1/ai/grade-and-classify`)*.
+
+
+---
+
+## 📊 Hasil Evaluasi Model AI (Machine Learning)
+
+| Evaluasi | Hasil | Keterangan |
+| :--- | :---: | :--- |
+| **Akurasi Kategori Pakaian** | **100.00%** | 4 Kelas: *Shirt, T-Shirt, Pants, Jacket* |
+| **Akurasi Grading Kondisi** | **84.38%** | 4 Kelas: *Grade A, B, C, D* (Target proposal: $\\ge 80\\%$) |
+| **Blind Test Google Drive** | **82.38% Confidence** | 545 Foto pakaian secondhand asli |
+
+Grafik dan visual hasil training & evaluasi dapat dilihat di:
+- [Confusion Matrix](ml/reports/confusion_matrix.png)
+- [Training Curves](ml/reports/training_curves.png)
+- [Drive Test Samples Visual Grid](ml/reports/drive_test_samples.png)
+- Folder Hasil: [\ml/reports/\](ml/reports/) dan [\ml/results/\](ml/results/)

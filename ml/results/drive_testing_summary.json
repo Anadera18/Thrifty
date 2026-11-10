@@ -1,0 +1,21 @@
+{
+  "total_images_tested": 545,
+  "category_distribution": {
+    "Shirt": 8,
+    "T-Shirt": 322,
+    "Pants": 203,
+    "Jacket": 12
+  },
+  "grade_distribution": {
+    "Grade A": 9,
+    "Grade B": 34,
+    "Grade C": 12,
+    "Grade D": 490
+  },
+  "average_quality_score": 51.9,
+  "median_quality_score": 50,
+  "average_category_confidence": 0.6643,
+  "average_grade_confidence": 0.8238,
+  "source_drive_url": "https://drive.google.com/drive/folders/1pEY_jlbsZB38lIm-cgMwevDShPHvmfiN",
+  "qa_scenario": "TS-15 ML Model Evaluation / TC-28 & TC-29 Varied Real-world Images"
+}
