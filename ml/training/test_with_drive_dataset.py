@@ -148,6 +148,16 @@ def run_evaluation():
     create_visual_grid(visual_samples, os.path.join(REPORTS_DIR, 'drive_test_samples.png'))
     print(f"Saved Visual Inspection Grid to: {os.path.join(REPORTS_DIR, 'drive_test_samples.png')}")
 
+    # Mirror to ml/results for convenience
+    results_dir = os.path.join('ml', 'results')
+    if os.path.exists(results_dir):
+        import shutil
+        for rf in ['drive_testing_results.csv', 'drive_testing_summary.json', 'drive_test_samples.png']:
+            src = os.path.join(REPORTS_DIR, rf)
+            if os.path.exists(src):
+                shutil.copy2(src, os.path.join(results_dir, rf))
+        print("Mirrored Drive testing results to ml/results/")
+
     print("\n" + "=" * 60)
     print("Testing Summary on Google Drive Secondhand Fashion Dataset:")
     print(f"  - Total Images Evaluated: {len(results)}")

@@ -278,6 +278,16 @@ def main():
     except Exception as e:
         print(f"TFLite export note: {e}")
 
+    # Mirror to ml/results for convenience
+    results_dir = os.path.join('ml', 'results')
+    if os.path.exists(results_dir):
+        import shutil
+        for rf in ['evaluation_report.json', 'confusion_matrix.png', 'training_curves.png']:
+            src = os.path.join(reports_dir, rf)
+            if os.path.exists(src):
+                shutil.copy2(src, os.path.join(results_dir, rf))
+        print("Mirrored evaluation reports to ml/results/")
+
     print("\nTraining & evaluation completed successfully!")
 
 if __name__ == '__main__':

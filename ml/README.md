@@ -59,9 +59,40 @@ Sesuai dengan Proposal Proyek PBL Semester 5:
 │   ├── test_with_drive_dataset.py # Evaluator dataset eksternal Google Drive
 │   └── train.py            # Pipeline training & evaluasi MobileNetV2
 ├── requirements.txt        # Dependensi Python
+├── retrain_model.bat       # 1-Click re-training pipeline (Windows CMD)
+├── retrain_model.ps1       # 1-Click re-training pipeline (PowerShell)
 ├── run_ml_service.bat      # 1-Click launcher untuk Windows Command Prompt
 └── run_ml_service.ps1      # 1-Click launcher untuk PowerShell
 \
+---
+
+## 🔄 Cara Melakukan Re-Training Model
+
+### Opsi 1: 1-Click Script (Paling Mudah)
+Klik ganda file berikut di File Explorer:
+\\cmd
+ml/retrain_model.bat
+\Atau jalankan via PowerShell:
+\\powershell
+.\ml\retrain_model.ps1
+\
+### Opsi 2: Manual via Command Line
+Jika ingin menjalankan langkah demi langkah melalui terminal:
+
+\\powershell
+# Pastikan berada di root proyek
+cd g:\tiara-project\Thrifty
+
+# 1. (Opsional) Re-generate data jika ingin membuat variasi dataset baru
+python ml/training/dataset_generator.py
+
+# 2. Re-train model MobileNetV2 Dual-Head
+python ml/training/train.py
+
+# 3. Evaluasi model hasil training dengan 545 foto pakaian asli Google Drive
+python ml/training/test_with_drive_dataset.py
+\*(Catatan: Jika \python\ belum ada di PATH, gunakan path lengkap: \$env:LOCALAPPDATA\Programs\Python\Python313\python.exe\)*.
+
 ---
 
 ## 🚀 Cara Menjalankan ML Microservice (FastAPI)
