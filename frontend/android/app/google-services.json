@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "156751886411",
+    "project_id": "thrifty-817a7",
+    "storage_bucket": "thrifty-817a7.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:156751886411:android:c5f3d597a818862c5b75ce",
+        "android_client_info": {
+          "package_name": "com.thrifty.thrifty"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCnD1NesQHISqeiUe5J2_YeTXC52hAcW0I"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

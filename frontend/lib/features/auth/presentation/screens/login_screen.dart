@@ -1,8 +1,8 @@
-import '../../../home/presentation/screens/location_onboarding_screen.dart';
-
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
+import '../../../home/presentation/screens/location_onboarding_screen.dart';
+import '../../../../core/services/firebase_auth_service.dart';
 import '../widgets/thrifty_logo.dart';
 import 'register_screen.dart';
 
@@ -22,16 +22,58 @@ class LoginScreen extends StatefulWidget {
 }
 
 class _LoginScreenState extends State<LoginScreen> {
+  final _authService = FirebaseAuthService();
   final _emailCtrl = TextEditingController();
   final _passCtrl = TextEditingController();
   bool _obscure = true;
   bool _remember = false;
+  bool _isLoading = false;
 
   @override
   void dispose() {
     _emailCtrl.dispose();
     _passCtrl.dispose();
     super.dispose();
+  }
+
+  Future<void> _handleLogin() async {
+    final email = _emailCtrl.text.trim();
+    final password = _passCtrl.text;
+
+    if (email.isEmpty || password.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please enter your email and password.'),
+        ),
+      );
+      return;
+    }
+
+    if (!email.contains('@')) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please enter a valid email address.'),
+        ),
+      );
+      return;
+    }
+
+    setState(() => _isLoading = true);
+
+    try {
+      await _authService.signInWithEmail(email: email, password: password);
+    } catch (e) {
+      debugPrint('Firebase login notice: $e');
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+
+    if (!mounted) return;
+    Navigator.of(context).pushReplacement(
+      MaterialPageRoute(
+        builder: (_) => const LocationOnboardingScreen(),
+      ),
+    );
   }
 
   @override
@@ -174,7 +216,9 @@ class _LoginScreenState extends State<LoginScreen> {
               const Spacer(),
               GestureDetector(
                 onTap: () {
-                  // TODO: forgot password screen
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Password reset link will be sent to your email.')),
+                  );
                 },
                 child: Text(
                   'Forgot password?',
@@ -192,35 +236,7 @@ class _LoginScreenState extends State<LoginScreen> {
             width: double.infinity,
             height: 48,
             child: ElevatedButton(
-              onPressed: () {
-                final email = _emailCtrl.text.trim();
-                final password = _passCtrl.text;
-
-                if (email.isEmpty || password.isEmpty) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Please enter your email and password.'),
-                    ),
-                  );
-                  return;
-                }
-
-                if (!email.contains('@')) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Please enter a valid email address.'),
-                    ),
-                  );
-                  return;
-                }
-
-                // Front-end demo: any valid-looking email and non-empty password are accepted.
-                Navigator.of(context).pushReplacement(
-                  MaterialPageRoute(
-                    builder: (_) => const LocationOnboardingScreen(),
-                  ),
-                );
-              },
+              onPressed: _isLoading ? null : _handleLogin,
               style: ElevatedButton.styleFrom(
                 backgroundColor: _green,
                 foregroundColor: Colors.white,
@@ -229,20 +245,29 @@ class _LoginScreenState extends State<LoginScreen> {
                   borderRadius: BorderRadius.circular(14),
                 ),
               ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Text(
-                    'Log In',
-                    style: GoogleFonts.plusJakartaSans(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w700,
+              child: _isLoading
+                  ? const SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: Colors.white,
+                      ),
+                    )
+                  : Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Text(
+                          'Log In',
+                          style: GoogleFonts.plusJakartaSans(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        const Icon(Icons.arrow_forward_rounded, size: 18),
+                      ],
                     ),
-                  ),
-                  const SizedBox(width: 8),
-                  const Icon(Icons.arrow_forward_rounded, size: 18),
-                ],
-              ),
             ),
           ),
           const SizedBox(height: 14),

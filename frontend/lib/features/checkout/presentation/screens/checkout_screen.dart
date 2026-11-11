@@ -226,7 +226,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                 style: _bodyStyle(13, weight: FontWeight.w800),
               ),
             ),
-            ?trailing,
+            if (trailing != null) trailing,
           ],
         ),
         const SizedBox(height: 11),

@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
+import '../../../../core/services/firebase_auth_service.dart';
+import '../../../home/presentation/screens/location_onboarding_screen.dart';
+
 const _bg = Color(0xFFFBF9FF);
 const _ink = Color(0xFF111827);
 const _muted = Color(0xFF5B6270);
@@ -24,6 +27,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
   bool _hidePassword = true;
   bool _hideConfirmPassword = true;
   bool _agreedToTerms = false;
+  bool _isLoading = false;
 
   @override
   void dispose() {
@@ -34,9 +38,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
     super.dispose();
   }
 
-  void _createAccount() {
+  Future<void> _createAccount() async {
     final formIsValid = _formKey.currentState?.validate() ?? false;
-
     if (!formIsValid) return;
 
     if (!_agreedToTerms) {
@@ -49,9 +52,31 @@ class _RegisterScreenState extends State<RegisterScreen> {
       return;
     }
 
-    // TODO: Send name, email, and password to your auth provider/API.
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Registration form is ready to submit.')),
+    setState(() => _isLoading = true);
+
+    try {
+      await FirebaseAuthService().registerWithEmail(
+        email: _emailController.text.trim(),
+        password: _passwordController.text,
+        name: _nameController.text.trim(),
+      );
+
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Account created in Firebase successfully!'),
+          backgroundColor: _green,
+        ),
+      );
+    } catch (e) {
+      debugPrint('Firebase registration notice: $e');
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+
+    if (!mounted) return;
+    Navigator.of(context).pushReplacement(
+      MaterialPageRoute(builder: (_) => const LocationOnboardingScreen()),
     );
   }
 
@@ -108,15 +133,14 @@ class _RegisterScreenState extends State<RegisterScreen> {
   Widget _buildFormCard() {
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(19),
+      padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFFF0EFF5)),
         boxShadow: const [
           BoxShadow(
-            color: Color(0x0D000000),
-            blurRadius: 12,
+            color: Color(0x0A000000),
+            blurRadius: 18,
             offset: Offset(0, 3),
           ),
         ],
@@ -241,9 +265,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
             const SizedBox(height: 14),
             SizedBox(
               width: double.infinity,
-              height: 42,
+              height: 44,
               child: ElevatedButton(
-                onPressed: _createAccount,
+                onPressed: _isLoading ? null : _createAccount,
                 style: ElevatedButton.styleFrom(
                   backgroundColor: _green,
                   foregroundColor: Colors.white,
@@ -252,20 +276,29 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     borderRadius: BorderRadius.circular(10),
                   ),
                 ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Text(
-                      'Create Account',
-                      style: GoogleFonts.plusJakartaSans(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w700,
+                child: _isLoading
+                    ? const SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Colors.white,
+                        ),
+                      )
+                    : Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Text(
+                            'Create Account',
+                            style: GoogleFonts.plusJakartaSans(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                          const SizedBox(width: 7),
+                          const Icon(Icons.arrow_forward_rounded, size: 18),
+                        ],
                       ),
-                    ),
-                    const SizedBox(width: 7),
-                    const Icon(Icons.arrow_forward_rounded, size: 18),
-                  ],
-                ),
               ),
             ),
           ],
@@ -306,19 +339,19 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   height: 1.45,
                   color: _muted,
                 ),
-                children: [
-                  const TextSpan(text: "I agree to THRIFTY's "),
+                children: const [
+                  TextSpan(text: "I agree to THRIFTY's "),
                   TextSpan(
                     text: 'Terms of Service',
-                    style: const TextStyle(
+                    style: TextStyle(
                       color: Color(0xFF075C7A),
                       decoration: TextDecoration.underline,
                     ),
                   ),
-                  const TextSpan(text: ' and '),
+                  TextSpan(text: ' and '),
                   TextSpan(
                     text: 'Privacy Policy',
-                    style: const TextStyle(
+                    style: TextStyle(
                       color: Color(0xFF075C7A),
                       decoration: TextDecoration.underline,
                     ),

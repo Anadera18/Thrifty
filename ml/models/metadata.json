@@ -1,0 +1,29 @@
+{
+  "model_name": "Thrifty MobileNetV2 Dual-Head",
+  "backbone": "MobileNetV2 (ImageNet pretrained)",
+  "categories": [
+    "Shirt",
+    "T-Shirt",
+    "Pants",
+    "Jacket"
+  ],
+  "grades": [
+    "Grade A",
+    "Grade B",
+    "Grade C",
+    "Grade D"
+  ],
+  "grade_descriptions": {
+    "Grade A": "Like New - Clothing appears almost new, with little to no visible sign of use.",
+    "Grade B": "Very Good - Clothing shows minor visible signs of use but remains in very good condition.",
+    "Grade C": "Good / Usable - Clothing shows visible signs of use or minor defects but remains fully usable.",
+    "Grade D": "Significant Wear - Clothing shows noticeable visible defects or substantial signs of wear."
+  },
+  "test_category_accuracy": 1.0,
+  "test_grade_accuracy": 0.8438,
+  "input_shape": [
+    224,
+    224,
+    3
+  ]
+}
