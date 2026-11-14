@@ -1,0 +1,3 @@
+| Task | Prompt summary | What I verified | Decision |
+|---|---|---|---|
+| Phase 2 Step 1 — database schema and security | Create the THRIFTY Supabase schema, RLS grants/policies, SQL Editor checks, and log the step. | Read the current product model and add-product persistence fields; verified the ML service returns grade confidence as a 0–1 probability; checked current Supabase RLS, trigger, and SQL Editor testing guidance. | Profiles store buyer/seller role and display name; products store public seller name and A–D AI/final grades; user-owned writes are protected by RLS; helper access is granted only to authenticated. |
