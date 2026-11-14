@@ -18,10 +18,9 @@ class FilterScreen extends StatefulWidget {
 
 class _FilterScreenState extends State<FilterScreen> {
   final _searchController = TextEditingController();
-  double _radius = 5;
   RangeValues _price = const RangeValues(0, 150000);
   String _category = 'All';
-  String _condition = 'A';
+  String _condition = 'All';
   bool _localPickup = true;
   bool _verified = false;
 
@@ -90,7 +89,6 @@ class _FilterScreenState extends State<FilterScreen> {
             child: ElevatedButton.icon(
               onPressed: () => Navigator.of(context).pop(
                 FilterResult(
-                  radius: _radius,
                   category: _category,
                   minPrice: _price.start,
                   maxPrice: _price.end,
@@ -142,48 +140,10 @@ class _FilterScreenState extends State<FilterScreen> {
 
   Widget _buildRadiusCard() {
     return _section(
-      title: 'Search radius',
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Text(
-                '${_radius.round()} km',
-                style: GoogleFonts.plusJakartaSans(
-                  fontSize: 22,
-                  fontWeight: FontWeight.w800,
-                  color: _ink,
-                ),
-              ),
-              const SizedBox(width: 6),
-              Text('from current spot', style: _bodyStyle()),
-              const Spacer(),
-              _pill('Walking & local pickup'),
-            ],
-          ),
-          Slider(
-            value: _radius,
-            min: 1,
-            max: 10,
-            divisions: 9,
-            activeColor: _darkTeal,
-            onChanged: (value) => setState(() => _radius = value),
-          ),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              _caption('1 km'),
-              _caption('5 km optimal'),
-              _caption('10 km'),
-            ],
-          ),
-          const SizedBox(height: 8),
-          Text(
-            'Shows preloved drops near Bandung within reachable distance.',
-            style: _bodyStyle(),
-          ),
-        ],
+      title: 'Pickup location',
+      child: Text(
+        'Distance filtering is not available yet. Results can be filtered by category, price, condition, and item text.',
+        style: _bodyStyle(),
       ),
     );
   }
@@ -250,10 +210,10 @@ class _FilterScreenState extends State<FilterScreen> {
       trailing: 'AI graded',
       child: Wrap(
         spacing: 8,
-        children: ['A', 'B', 'C', 'D']
+        children: ['All', 'A', 'B', 'C', 'D']
             .map(
               (item) => ChoiceChip(
-                label: Text('Grade $item'),
+                label: Text(item == 'All' ? item : 'Grade $item'),
                 selected: _condition == item,
                 selectedColor: _cyanSoft,
                 labelStyle: GoogleFonts.plusJakartaSans(
@@ -354,24 +314,6 @@ class _FilterScreenState extends State<FilterScreen> {
     );
   }
 
-  Widget _pill(String label) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-      decoration: BoxDecoration(
-        color: _cyanSoft,
-        borderRadius: BorderRadius.circular(999),
-      ),
-      child: Text(
-        label,
-        style: GoogleFonts.plusJakartaSans(
-          fontSize: 9,
-          fontWeight: FontWeight.w700,
-          color: _darkTeal,
-        ),
-      ),
-    );
-  }
-
   TextStyle _titleStyle() => GoogleFonts.plusJakartaSans(
     fontSize: 14,
     fontWeight: FontWeight.w700,
@@ -384,8 +326,6 @@ class _FilterScreenState extends State<FilterScreen> {
   TextStyle _captionStyle() =>
       GoogleFonts.plusJakartaSans(fontSize: 10, color: _muted);
 
-  Widget _caption(String text) => Text(text, style: _captionStyle());
-
   InputBorder _border({Color color = Colors.transparent}) => OutlineInputBorder(
     borderRadius: BorderRadius.circular(14),
     borderSide: BorderSide(color: color),
@@ -393,10 +333,9 @@ class _FilterScreenState extends State<FilterScreen> {
 
   void _reset() {
     setState(() {
-      _radius = 5;
       _price = const RangeValues(0, 150000);
       _category = 'All';
-      _condition = 'A';
+      _condition = 'All';
       _localPickup = true;
       _verified = false;
     });
@@ -405,7 +344,6 @@ class _FilterScreenState extends State<FilterScreen> {
 
 class FilterResult {
   const FilterResult({
-    required this.radius,
     required this.category,
     required this.minPrice,
     required this.maxPrice,
@@ -413,7 +351,6 @@ class FilterResult {
     required this.query,
   });
 
-  final double radius;
   final String category;
   final double minPrice;
   final double maxPrice;

@@ -86,6 +86,42 @@ class ProductModel {
     );
   }
 
+  factory ProductModel.fromSupabase(Map<String, dynamic> row) {
+    final sellerName = row['seller_name']?.toString() ?? 'Seller';
+    final imageUrls = row['image_urls'];
+    final createdAt = row['created_at']?.toString();
+
+    return ProductModel(
+      id: row['id']?.toString() ?? '',
+      name: row['name']?.toString() ?? '',
+      brand: row['brand']?.toString() ?? '',
+      price: (row['price'] as num?)?.toInt() ?? 0,
+      category: row['category']?.toString() ?? '',
+      grade: 'Grade ${row['final_grade']?.toString() ?? ''}'.trim(),
+      description: row['description']?.toString() ?? '',
+      imageUrls: imageUrls is List
+          ? imageUrls.whereType<String>().toList(growable: false)
+          : const <String>[],
+      distance: 'Distance unavailable',
+      rating: 'No reviews yet',
+      sellerId: row['seller_id']?.toString() ?? '',
+      sellerName: sellerName,
+      sellerAvatar: _initials(sellerName),
+      pickupLocation: row['pickup_location']?.toString() ?? '',
+      latitude: (row['latitude'] as num?)?.toDouble(),
+      longitude: (row['longitude'] as num?)?.toDouble(),
+      size: row['size']?.toString() ?? '',
+      status: row['status']?.toString() ?? '',
+      createdAt: createdAt == null ? null : DateTime.tryParse(createdAt),
+    );
+  }
+
+  static String _initials(String name) {
+    final parts = name.trim().split(RegExp(r'\s+')).where((part) => part.isNotEmpty);
+    final initials = parts.take(2).map((part) => part[0].toUpperCase()).join();
+    return initials.isEmpty ? 'S' : initials;
+  }
+
   Map<String, dynamic> toMap() {
     return {
       'name': name,

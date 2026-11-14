@@ -132,3 +132,44 @@ rollback;
 --    not readable by anon or by another authenticated user; profiles have no DELETE grant.
 -- Run each expected-denial statement in its own BEGIN/ROLLBACK block because a SQL
 -- error aborts that transaction. Do not use placeholder UUIDs for these behavior tests.
+
+-- Step 8 owner-action verification (run as a separate, single SQL Editor query).
+-- Replace the three quoted placeholders with UUIDs from Authentication > Users and
+-- Table Editor > public.products. Use an active test listing owned by SELLER_A.
+-- The final ROLLBACK restores its original name/status and cancels the test deletion.
+-- Expected output: SELLER_A's first update returns one active row; SELLER_B
+-- returns no rows for UPDATE or DELETE while the listing is still active;
+-- SELLER_A then marks it sold (one row) and deletes it (one row); then rollback.
+-- This uses a real row and real account IDs, but RLS is exercised by setting the
+-- authenticated role and request.jwt.claim.sub, as in Supabase's documented tests.
+--
+-- begin;
+-- set local role authenticated;
+-- set local request.jwt.claim.sub = '<SELLER_A_UUID>';
+-- select private.current_user_role(); -- seller
+-- update public.products
+--    set name = name || ' [step8 temporary test]'
+--  where id = '<SELLER_A_PRODUCT_UUID>'::uuid
+--    and seller_id = auth.uid()
+-- returning id, status; -- exactly one row, still active
+--
+-- set local request.jwt.claim.sub = '<SELLER_B_UUID>';
+-- update public.products
+--    set name = name || ' [unauthorized attempt]'
+--  where id = '<SELLER_A_PRODUCT_UUID>'::uuid
+-- returning id; -- zero rows
+-- delete from public.products
+--  where id = '<SELLER_A_PRODUCT_UUID>'::uuid
+-- returning id; -- zero rows
+--
+-- set local request.jwt.claim.sub = '<SELLER_A_UUID>';
+-- update public.products
+--    set status = 'sold'
+--  where id = '<SELLER_A_PRODUCT_UUID>'::uuid
+--    and seller_id = auth.uid()
+-- returning id, status; -- exactly one row, status sold
+-- delete from public.products
+--  where id = '<SELLER_A_PRODUCT_UUID>'::uuid
+--    and seller_id = auth.uid()
+-- returning id; -- exactly one row
+-- rollback; -- restores the test listing; do not replace with COMMIT

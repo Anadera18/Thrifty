@@ -1,11 +1,12 @@
-import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../../../auth/presentation/widgets/seller_only_gate.dart';
 import '../../../home/presentation/screens/home_screen.dart';
 import '../../../add_product/presentation/screens/add_product_screen.dart';
 import '../../../../core/models/product_model.dart';
-import '../../../../core/services/firestore_product_service.dart';
+import '../../../../core/services/supabase_product_service.dart';
 
 const _bg = Color(0xFFFBF9FF);
 const _surface = Colors.white;
@@ -22,46 +23,40 @@ class MyListingsScreen extends StatefulWidget {
 }
 
 class _MyListingsScreenState extends State<MyListingsScreen> {
-  final FirestoreProductService _productService = FirestoreProductService();
-  StreamSubscription? _listingsSub;
+  final SupabaseProductService _productService = SupabaseProductService();
   List<ProductModel> _items = [];
   bool _isLoading = true;
-  int _selectedTab = 0; // 0: Active, 1: Sold, 2: Drafts
+  bool _isMutating = false;
+  Object? _loadError;
+  int _selectedTab = 0; // 0: Active, 1: Sold
 
   @override
   void initState() {
     super.initState();
-    _subscribeListings();
+    _loadListings();
   }
 
-  void _subscribeListings() {
-    _listingsSub = _productService.streamActiveProducts().listen(
-      (snapshot) {
-        if (!mounted) return;
-        setState(() {
-          _items = snapshot.docs.map(ProductModel.fromFirestore).toList();
-          _isLoading = false;
-        });
-      },
-      onError: (err) {
-        debugPrint('MyListings stream error: $err');
-        if (!mounted) return;
-        setState(() => _isLoading = false);
-      },
-    );
-  }
-
-  @override
-  void dispose() {
-    _listingsSub?.cancel();
-    super.dispose();
+  Future<void> _loadListings() async {
+    final sellerId = Supabase.instance.client.auth.currentUser?.id;
+    if (sellerId == null) {
+      if (mounted) setState(() { _loadError = StateError('No signed-in seller.'); _isLoading = false; });
+      return;
+    }
+    setState(() { _isLoading = true; _loadError = null; });
+    try {
+      final rows = await _productService.fetchSellerProducts(sellerId);
+      if (!mounted) return;
+      setState(() { _items = rows; _isLoading = false; });
+    } catch (error) {
+      debugPrint('My Listings load error: $error');
+      if (!mounted) return;
+      setState(() { _loadError = error; _isLoading = false; });
+    }
   }
 
   List<ProductModel> get _filteredItems {
     if (_selectedTab == 1) {
       return _items.where((i) => i.status == 'sold').toList();
-    } else if (_selectedTab == 2) {
-      return _items.where((i) => i.status == 'draft').toList();
     }
     return _items.where((i) => i.status == 'active').toList();
   }
@@ -103,7 +98,7 @@ class _MyListingsScreenState extends State<MyListingsScreen> {
         padding: const EdgeInsets.fromLTRB(18, 4, 18, 24),
         children: [
           Text(
-            'Manage your wardrobe archive on Cloud Firestore',
+            'Your active and sold listings',
             style: GoogleFonts.plusJakartaSans(fontSize: 13, color: _muted),
           ),
           const SizedBox(height: 18),
@@ -117,6 +112,17 @@ class _MyListingsScreenState extends State<MyListingsScreen> {
               child: Center(
                 child: CircularProgressIndicator(color: _darkTeal),
               ),
+            )
+          else if (_loadError != null)
+            Padding(
+              padding: const EdgeInsets.all(28),
+              child: Column(children: [
+                const Icon(Icons.cloud_off_outlined, size: 42, color: _muted),
+                const SizedBox(height: 8),
+                const Text('Could not load your listings.'),
+                const SizedBox(height: 8),
+                TextButton(onPressed: _loadListings, child: const Text('Retry')),
+              ]),
             )
           else if (_filteredItems.isEmpty)
             Padding(
@@ -132,8 +138,8 @@ class _MyListingsScreenState extends State<MyListingsScreen> {
                     const SizedBox(height: 10),
                     Text(
                       _selectedTab == 0
-                          ? 'No active listings in database yet.'
-                          : 'No items in this tab.',
+                          ? 'You have no active listings yet.'
+                          : 'You have no sold listings yet.',
                       style: GoogleFonts.plusJakartaSans(
                         fontSize: 13,
                         color: _muted,
@@ -149,9 +155,10 @@ class _MyListingsScreenState extends State<MyListingsScreen> {
                 padding: const EdgeInsets.only(bottom: 12),
                 child: _ListingCard(
                   listing: item,
-                  onDelete: () => _deleteListing(item),
-                  onToggleSold: () => _toggleSoldStatus(item),
+                  isBusy: _isMutating,
                   onEdit: () => _editListing(item),
+                  onMarkSold: () => _markSold(item),
+                  onDelete: () => _deleteListing(item),
                 ),
               ),
             ),
@@ -171,7 +178,7 @@ class _MyListingsScreenState extends State<MyListingsScreen> {
   }
 
   Widget _buildTabs(int activeCount, int soldCount) {
-    final labels = ['Active $activeCount', 'Sold $soldCount', 'Drafts'];
+    final labels = ['Active $activeCount', 'Sold $soldCount'];
     return Container(
       padding: const EdgeInsets.all(4),
       decoration: BoxDecoration(
@@ -241,7 +248,7 @@ class _MyListingsScreenState extends State<MyListingsScreen> {
                   ),
                 ),
                 Text(
-                  '${_items.length} items cataloged in Firestore',
+                  '${_items.length} of your Supabase listings',
                   style: GoogleFonts.plusJakartaSans(
                     fontSize: 12,
                     color: _muted,
@@ -270,137 +277,107 @@ class _MyListingsScreenState extends State<MyListingsScreen> {
 
   Future<void> _openAddProduct() async {
     await Navigator.of(context).push(
-      MaterialPageRoute(builder: (_) => const AddProductScreen()),
+      MaterialPageRoute(
+        builder: (_) => const SellerOnlyGate(child: AddProductScreen()),
+      ),
+    );
+    if (mounted) _loadListings();
+  }
+
+  Future<void> _editListing(ProductModel listing) async {
+    final editValues = await showDialog<Map<String, dynamic>>(
+      context: context,
+      builder: (_) => _EditListingDialog(listing: listing),
+    );
+    if (!mounted || editValues == null) return;
+    await _runOwnerAction(
+      () => _productService.updateProductDetails(
+        productId: listing.id,
+        name: editValues['name'] as String,
+        brand: editValues['brand'] as String,
+        size: editValues['size'] as String,
+        category: editValues['category'] as String,
+        price: editValues['price'] as int,
+        description: editValues['description'] as String,
+        pickupLocation: editValues['pickup_location'] as String,
+      ),
+      'Listing updated.',
     );
   }
 
-  Future<void> _deleteListing(ProductModel listing) async {
-    final confirm = await showDialog<bool>(
+  Future<void> _markSold(ProductModel listing) async {
+    final confirmed = await showDialog<bool>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Delete Listing?'),
-        content: Text('Remove "${listing.name}" permanently from Firestore?'),
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Mark as sold?'),
+        content: Text('“${listing.name}” will move to your Sold tab.'),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
+            onPressed: () => Navigator.pop(dialogContext, false),
             child: const Text('Cancel'),
           ),
-          ElevatedButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
-            child: const Text('Delete', style: TextStyle(color: Colors.white)),
+          FilledButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: const Text('Mark sold'),
           ),
         ],
       ),
     );
-
-    if (confirm != true) return;
-
-    try {
-      await _productService.deleteProduct(listing.id);
-      _showMessage('${listing.name} deleted from Firestore.');
-    } catch (e) {
-      _showMessage('Error deleting listing: $e');
-    }
+    if (!mounted || confirmed != true) return;
+    await _runOwnerAction(
+      () => _productService.markProductSold(listing.id),
+      'Listing marked as sold.',
+    );
   }
 
-  Future<void> _toggleSoldStatus(ProductModel listing) async {
-    final nextStatus = listing.status == 'sold' ? 'active' : 'sold';
-    try {
-      await _productService.updateProduct(listing.id, {'status': nextStatus});
-      _showMessage(
-        nextStatus == 'sold'
-            ? 'Marked as Sold!'
-            : 'Relisted as Active item.',
-      );
-    } catch (e) {
-      _showMessage('Failed to update status: $e');
-    }
-  }
-
-  Future<void> _editListing(ProductModel listing) async {
-    final nameCtrl = TextEditingController(text: listing.name);
-    final priceCtrl = TextEditingController(text: listing.price.toString());
-    final brandCtrl = TextEditingController(text: listing.brand);
-    String selectedGrade = listing.grade;
-
-    final updated = await showDialog<bool>(
+  Future<void> _deleteListing(ProductModel listing) async {
+    final confirmed = await showDialog<bool>(
       context: context,
-      builder: (ctx) => StatefulBuilder(
-        builder: (context, setDlgState) => AlertDialog(
-          title: Text(
-            'Edit Listing',
-            style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.bold),
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Delete listing?'),
+        content: Text('“${listing.name}” will be permanently deleted.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('Cancel'),
           ),
-          content: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                TextField(
-                  controller: nameCtrl,
-                  decoration: const InputDecoration(labelText: 'Item Name'),
-                ),
-                TextField(
-                  controller: brandCtrl,
-                  decoration: const InputDecoration(labelText: 'Brand'),
-                ),
-                TextField(
-                  controller: priceCtrl,
-                  keyboardType: TextInputType.number,
-                  decoration: const InputDecoration(labelText: 'Price (Rp)'),
-                ),
-                const SizedBox(height: 12),
-                DropdownButtonFormField<String>(
-                  initialValue: ['Grade A · Like new', 'Grade B · Very good', 'Grade C · Good / Usable', 'Grade D · Significant wear', 'Grade A', 'Grade B', 'Grade C', 'Grade D']
-                          .contains(selectedGrade)
-                      ? selectedGrade
-                      : 'Grade A · Like new',
-                  decoration: const InputDecoration(labelText: 'Condition Grade'),
-                  items: const [
-                    DropdownMenuItem(value: 'Grade A · Like new', child: Text('Grade A · Like new')),
-                    DropdownMenuItem(value: 'Grade B · Very good', child: Text('Grade B · Very good')),
-                    DropdownMenuItem(value: 'Grade C · Good / Usable', child: Text('Grade C · Good / Usable')),
-                    DropdownMenuItem(value: 'Grade D · Significant wear', child: Text('Grade D · Significant wear')),
-                  ],
-                  onChanged: (val) {
-                    if (val != null) setDlgState(() => selectedGrade = val);
-                  },
-                ),
-              ],
-            ),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: Colors.red),
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: const Text('Delete'),
           ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx, false),
-              child: const Text('Cancel'),
-            ),
-            ElevatedButton(
-              onPressed: () => Navigator.pop(ctx, true),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: _darkTeal,
-                foregroundColor: Colors.white,
-              ),
-              child: const Text('Save'),
-            ),
-          ],
-        ),
+        ],
       ),
     );
+    if (!mounted || confirmed != true) return;
+    await _runOwnerAction(
+      () => _productService.deleteProduct(listing.id),
+      'Listing deleted.',
+    );
+  }
 
-    if (updated != true) return;
-
+  Future<void> _runOwnerAction(
+    Future<void> Function() action,
+    String successMessage,
+  ) async {
+    if (_isMutating) return;
+    setState(() => _isMutating = true);
     try {
-      final newPrice = int.tryParse(priceCtrl.text.replaceAll(RegExp(r'[^0-9]'), '')) ?? listing.price;
-      await _productService.updateProduct(listing.id, {
-        'name': nameCtrl.text.trim(),
-        'brand': brandCtrl.text.trim(),
-        'price': newPrice,
-        'grade': selectedGrade,
-      });
-      _showMessage('Listing updated successfully!');
-    } catch (e) {
-      _showMessage('Failed to update listing: ');
+      await action();
+      if (!mounted) return;
+      await _loadListings();
+      if (mounted) _showMessage(successMessage);
+    } catch (error) {
+      if (mounted) _showMessage('Could not update listing: $error');
+    } finally {
+      if (mounted) setState(() => _isMutating = false);
     }
+  }
+
+  void _showMessage(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message)),
+    );
   }
 
   void _goHome() {
@@ -409,24 +386,172 @@ class _MyListingsScreenState extends State<MyListingsScreen> {
       (route) => false,
     );
   }
+}
 
-  void _showMessage(String text) {
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(text)));
+class _EditListingDialog extends StatefulWidget {
+  const _EditListingDialog({required this.listing});
+
+  final ProductModel listing;
+
+  @override
+  State<_EditListingDialog> createState() => _EditListingDialogState();
+}
+
+class _EditListingDialogState extends State<_EditListingDialog> {
+  final _formKey = GlobalKey<FormState>();
+  late final TextEditingController _nameController;
+  late final TextEditingController _brandController;
+  late final TextEditingController _sizeController;
+  late final TextEditingController _priceController;
+  late final TextEditingController _descriptionController;
+  late final TextEditingController _locationController;
+  late String _category;
+
+  @override
+  void initState() {
+    super.initState();
+    final listing = widget.listing;
+    _nameController = TextEditingController(text: listing.name);
+    _brandController = TextEditingController(text: listing.brand);
+    _sizeController = TextEditingController(text: listing.size);
+    _priceController = TextEditingController(text: listing.price.toString());
+    _descriptionController = TextEditingController(text: listing.description);
+    _locationController = TextEditingController(text: listing.pickupLocation);
+    _category = listing.category;
+  }
+
+  @override
+  void dispose() {
+    _nameController.dispose();
+    _brandController.dispose();
+    _sizeController.dispose();
+    _priceController.dispose();
+    _descriptionController.dispose();
+    _locationController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Edit listing'),
+      content: SizedBox(
+        width: 420,
+        child: SingleChildScrollView(
+          child: Form(
+            key: _formKey,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextFormField(
+                  controller: _nameController,
+                  maxLength: 160,
+                  decoration: const InputDecoration(labelText: 'Item name'),
+                  validator: (value) => value == null || value.trim().isEmpty
+                      ? 'Enter an item name.'
+                      : null,
+                ),
+                TextFormField(
+                  controller: _brandController,
+                  maxLength: 120,
+                  decoration: const InputDecoration(labelText: 'Brand'),
+                ),
+                TextFormField(
+                  controller: _sizeController,
+                  maxLength: 40,
+                  decoration: const InputDecoration(labelText: 'Size'),
+                  validator: (value) => value == null || value.trim().isEmpty
+                      ? 'Enter a size.'
+                      : null,
+                ),
+                DropdownButtonFormField<String>(
+                  initialValue: _category,
+                  decoration: const InputDecoration(labelText: 'Category'),
+                  items: const [
+                    DropdownMenuItem(value: 'Shirt', child: Text('Shirt')),
+                    DropdownMenuItem(value: 'T-Shirt', child: Text('T-Shirt')),
+                    DropdownMenuItem(value: 'Pants', child: Text('Pants')),
+                    DropdownMenuItem(value: 'Jacket', child: Text('Jacket')),
+                  ],
+                  onChanged: (value) {
+                    if (value != null) setState(() => _category = value);
+                  },
+                ),
+                TextFormField(
+                  controller: _priceController,
+                  keyboardType: TextInputType.number,
+                  decoration: const InputDecoration(labelText: 'Price (Rp)'),
+                  validator: (value) {
+                    final price = int.tryParse(value?.trim() ?? '');
+                    return price == null || price <= 0
+                        ? 'Enter a price greater than zero.'
+                        : null;
+                  },
+                ),
+                TextFormField(
+                  controller: _locationController,
+                  maxLength: 240,
+                  decoration: const InputDecoration(labelText: 'Pickup location'),
+                  validator: (value) => value == null || value.trim().isEmpty
+                      ? 'Enter a pickup location.'
+                      : null,
+                ),
+                TextFormField(
+                  controller: _descriptionController,
+                  maxLines: 3,
+                  decoration: const InputDecoration(labelText: 'Description'),
+                ),
+                const SizedBox(height: 8),
+                const Text(
+                  'The AI grade and your condition grade are not changed here.',
+                  style: TextStyle(fontSize: 12, color: _muted),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('Cancel'),
+        ),
+        FilledButton(
+          onPressed: _save,
+          child: const Text('Save changes'),
+        ),
+      ],
+    );
+  }
+
+  void _save() {
+    if (!(_formKey.currentState?.validate() ?? false)) return;
+    Navigator.pop(context, {
+      'name': _nameController.text.trim(),
+      'brand': _brandController.text.trim(),
+      'size': _sizeController.text.trim(),
+      'category': _category,
+      'price': int.parse(_priceController.text.trim()),
+      'description': _descriptionController.text.trim(),
+      'pickup_location': _locationController.text.trim(),
+    });
   }
 }
 
 class _ListingCard extends StatelessWidget {
   const _ListingCard({
     required this.listing,
-    required this.onDelete,
-    required this.onToggleSold,
+    required this.isBusy,
     required this.onEdit,
+    required this.onMarkSold,
+    required this.onDelete,
   });
 
   final ProductModel listing;
-  final VoidCallback onDelete;
-  final VoidCallback onToggleSold;
+  final bool isBusy;
   final VoidCallback onEdit;
+  final VoidCallback onMarkSold;
+  final VoidCallback onDelete;
 
   @override
   Widget build(BuildContext context) {
@@ -527,38 +652,26 @@ class _ListingCard extends StatelessWidget {
                       ),
                     ),
                     const Spacer(),
-                    TextButton(
-                      onPressed: onToggleSold,
-                      style: TextButton.styleFrom(
+                    if (!isSold)
+                      IconButton(
+                        tooltip: 'Mark sold',
+                        onPressed: isBusy ? null : onMarkSold,
                         visualDensity: VisualDensity.compact,
-                        padding: const EdgeInsets.symmetric(horizontal: 8),
+                        icon: const Icon(Icons.check_circle_outline_rounded),
                       ),
-                      child: Text(
-                        isSold ? 'Relist' : 'Mark Sold',
-                        style: GoogleFonts.plusJakartaSans(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                    ),
                     IconButton(
                       tooltip: 'Edit listing',
-                      onPressed: onEdit,
+                      onPressed: isBusy ? null : onEdit,
                       visualDensity: VisualDensity.compact,
-                      icon: const Icon(
-                        Icons.edit_outlined,
-                        size: 19,
-                        color: _darkTeal,
-                      ),
+                      icon: const Icon(Icons.edit_outlined),
                     ),
                     IconButton(
                       tooltip: 'Delete listing',
-                      onPressed: onDelete,
+                      onPressed: isBusy ? null : onDelete,
                       visualDensity: VisualDensity.compact,
                       icon: const Icon(
                         Icons.delete_outline_rounded,
-                        size: 19,
-                        color: Color(0xFFDC2626),
+                        color: Colors.red,
                       ),
                     ),
                   ],
@@ -575,10 +688,12 @@ class _ListingCard extends StatelessWidget {
     return Container(
       color: const Color(0xFFD9E8EA),
       child: const Center(
-        child: Icon(
-          Icons.checkroom_rounded,
-          size: 32,
-          color: Color(0xFF4F7880),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.checkroom_rounded, size: 24, color: Color(0xFF4F7880)),
+            Text('No photo', style: TextStyle(fontSize: 9)),
+          ],
         ),
       ),
     );

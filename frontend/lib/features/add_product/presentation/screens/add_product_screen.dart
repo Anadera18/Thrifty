@@ -2,11 +2,10 @@ import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:firebase_auth/firebase_auth.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../../ai_grading/presentation/screens/ai_grading_result_screen.dart';
-import '../../../../core/services/firestore_product_service.dart';
-import '../../../../core/services/firebase_storage_service.dart';
+import '../../../../core/services/supabase_product_service.dart';
 
 const Color _green = Color(0xFF14532D);
 const Color _darkTeal = Color(0xFF0E3436);
@@ -24,8 +23,7 @@ class AddProductScreen extends StatefulWidget {
 
 class _AddProductScreenState extends State<AddProductScreen> {
   final ImagePicker _picker = ImagePicker();
-  final FirestoreProductService _productService = FirestoreProductService();
-  final FirebaseStorageService _storageService = FirebaseStorageService();
+  final SupabaseProductService _productService = SupabaseProductService();
 
   final _formKey = GlobalKey<FormState>();
   final _titleController = TextEditingController();
@@ -38,10 +36,19 @@ class _AddProductScreenState extends State<AddProductScreen> {
   final List<Uint8List> _photos = [];
   String _selectedCategory = 'T-Shirt';
   String _selectedSize = 'M';
-  String? _grade = 'Grade A • Like New';
+  String? _grade;
+  String? _aiGrade;
+  String? _finalGrade;
+  double? _aiConfidence;
   bool _pickingPhoto = false;
   bool _isPublishing = false;
   int _currentStep = 1; // 1: Photos & Category, 2: Condition, 3: Details
+
+  String? _gradeCode(String? label) {
+    final match = RegExp(r'Grade\s+([ABCD])', caseSensitive: false)
+        .firstMatch(label ?? '');
+    return match?.group(1)?.toUpperCase();
+  }
 
   @override
   void dispose() {
@@ -137,13 +144,19 @@ class _AddProductScreenState extends State<AddProductScreen> {
     if (!mounted || result == null) return;
     setState(() {
       if (result is Map) {
-        _grade = result['grade'] as String? ?? _grade;
+        _grade = result['grade'] as String?;
+        _aiGrade = result['aiGrade'] as String?;
+        _aiConfidence = (result['aiConfidence'] as num?)?.toDouble();
+        _finalGrade = result['finalGrade'] as String?;
         if (result['category'] != null &&
             (result['category'] as String).isNotEmpty) {
           _selectedCategory = result['category'] as String;
         }
       } else if (result is String) {
         _grade = result;
+        _finalGrade = _gradeCode(result);
+        _aiGrade = null;
+        _aiConfidence = null;
       }
       _currentStep = 3; // Advance to Step 3: Details & Publish
     });
@@ -151,9 +164,14 @@ class _AddProductScreenState extends State<AddProductScreen> {
 
   Future<void> _publishListing() async {
     if (!_formKey.currentState!.validate()) return;
-    if (_photos.isEmpty) {
+    if (_photos.isEmpty ||
+        _aiGrade == null ||
+        _aiConfidence == null ||
+        _finalGrade == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please add at least one photo.')),
+        const SnackBar(
+          content: Text('Complete the AI condition review before publishing.'),
+        ),
       );
       setState(() => _currentStep = 1);
       return;
@@ -162,54 +180,24 @@ class _AddProductScreenState extends State<AddProductScreen> {
     setState(() => _isPublishing = true);
 
     try {
-      final user = FirebaseAuth.instance.currentUser;
-      final sellerId = user?.uid ?? 'guest_seller';
-      final sellerName = user?.displayName ?? 'Community Seller';
-
-      // 1. Upload photos to Firebase Storage if available
-      final List<String> imageUrls = [];
-      for (int i = 0; i < _photos.length; i++) {
-        try {
-          final url = await _storageService.uploadProductImage(
-            bytes: _photos[i],
-            userId: sellerId,
-            fileName: 'item_${DateTime.now().millisecondsSinceEpoch}_$i',
-          );
-          imageUrls.add(url);
-        } catch (storageError) {
-          debugPrint('Storage upload fallback: $storageError');
-        }
+      final userId = Supabase.instance.client.auth.currentUser?.id;
+      if (userId == null) {
+        throw StateError('Your session ended. Please log in and try again.');
       }
 
-      // Fallback fallback sample image if storage failed or mock
-      if (imageUrls.isEmpty) {
-        imageUrls.add(
-          _selectedCategory == 'Jacket'
-              ? 'https://images.unsplash.com/photo-1551028719-00167b16eac5?w=800'
-              : _selectedCategory == 'Shirt'
-                  ? 'https://images.unsplash.com/photo-1596755094514-f87e34085b2c?w=800'
-                  : _selectedCategory == 'Pants'
-                      ? 'https://images.unsplash.com/photo-1624378439575-d8705ad7ae80?w=800'
-                      : 'https://images.unsplash.com/photo-1521572267360-ee0c2909d518?w=800',
-        );
-      }
-
-      final priceInt =
-          int.tryParse(_priceController.text.replaceAll(RegExp(r'[^0-9]'), '')) ??
-              50000;
-
-      // 2. Save directly to Cloud Firestore
+      final priceInt = int.parse(_priceController.text.trim());
       await _productService.createProduct(
-        sellerId: sellerId,
-        sellerName: sellerName,
+        sellerId: userId,
         name: _titleController.text.trim(),
         brand: _brandController.text.trim(),
+        size: _selectedSize,
         price: priceInt,
         category: _selectedCategory,
-        grade: _grade ?? 'Grade A • Like New',
+        aiGrade: _aiGrade!,
+        aiConfidence: _aiConfidence!,
+        finalGrade: _finalGrade!,
         description: _descriptionController.text.trim(),
-        imageUrls: imageUrls,
-        locationName: _locationController.text.trim(),
+        pickupLocation: _locationController.text.trim(),
         latitude: -7.9465,
         longitude: 112.6156,
       );
@@ -217,27 +205,29 @@ class _AddProductScreenState extends State<AddProductScreen> {
       if (!mounted) return;
 
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
+        const SnackBar(
           content: Row(
-            children: const [
+            children: [
               Icon(Icons.check_circle_outline, color: Colors.white),
               SizedBox(width: 8),
               Expanded(
-                child: Text('Listing published to Firestore successfully!'),
+                child: Text('Listing published successfully!'),
               ),
             ],
           ),
           backgroundColor: _green,
-          duration: const Duration(seconds: 3),
+          duration: Duration(seconds: 3),
         ),
       );
 
       Navigator.of(context).pop(true);
-    } catch (e) {
+    } catch (_) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Failed to publish listing: $e'),
+            content: const Text(
+              'Could not publish. Your form is still here; check your connection and try again.',
+            ),
             backgroundColor: Colors.red.shade700,
           ),
         );
@@ -516,7 +506,7 @@ class _AddProductScreenState extends State<AddProductScreen> {
                         ),
                       ),
                       Text(
-                        _grade ?? 'Grade A',
+                        _grade ?? 'Complete condition review first',
                         style: GoogleFonts.plusJakartaSans(
                           fontSize: 14,
                           fontWeight: FontWeight.w800,
@@ -530,6 +520,23 @@ class _AddProductScreenState extends State<AddProductScreen> {
                   onPressed: _goToConditionReview,
                   child: const Text('Change'),
                 ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 18),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: _line),
+            ),
+            child: const Row(
+              children: [
+                Icon(Icons.image_not_supported_outlined, color: _muted),
+                SizedBox(width: 8),
+                Expanded(child: Text('No photo will be attached in this step.')),
               ],
             ),
           ),
@@ -569,9 +576,12 @@ class _AddProductScreenState extends State<AddProductScreen> {
                       controller: _priceController,
                       keyboardType: TextInputType.number,
                       decoration: _inputDecoration('e.g. 120000'),
-                      validator: (v) => v == null || v.trim().isEmpty
-                          ? 'Enter price'
-                          : null,
+                      validator: (v) {
+                        final price = int.tryParse(v?.trim() ?? '');
+                        if (price == null) return 'Enter a whole-number price';
+                        if (price <= 0) return 'Price must be greater than 0';
+                        return null;
+                      },
                     ),
                   ],
                 ),
@@ -606,6 +616,9 @@ class _AddProductScreenState extends State<AddProductScreen> {
           TextFormField(
             controller: _locationController,
             decoration: _inputDecoration('e.g. Lowokwaru / Suhat Malang'),
+            validator: (v) => v == null || v.trim().isEmpty
+                ? 'Enter a pickup location'
+                : null,
           ),
           const SizedBox(height: 28),
           SizedBox(

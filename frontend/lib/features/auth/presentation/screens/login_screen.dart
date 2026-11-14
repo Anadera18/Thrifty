@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../../home/presentation/screens/location_onboarding_screen.dart';
-import '../../../../core/services/firebase_auth_service.dart';
+import '../../../../core/services/supabase_auth_service.dart';
 import '../widgets/thrifty_logo.dart';
 import 'register_screen.dart';
 
@@ -15,18 +16,19 @@ const _green = Color(0xFF14532D);
 const _line = Color(0xFFE5E3EF);
 
 class LoginScreen extends StatefulWidget {
-  const LoginScreen({super.key});
+  const LoginScreen({super.key, this.returnToCaller = false});
+
+  final bool returnToCaller;
 
   @override
   State<LoginScreen> createState() => _LoginScreenState();
 }
 
 class _LoginScreenState extends State<LoginScreen> {
-  final _authService = FirebaseAuthService();
+  final _authService = SupabaseAuthService();
   final _emailCtrl = TextEditingController();
   final _passCtrl = TextEditingController();
   bool _obscure = true;
-  bool _remember = false;
   bool _isLoading = false;
 
   @override
@@ -37,6 +39,8 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   Future<void> _handleLogin() async {
+    if (_isLoading) return;
+
     final email = _emailCtrl.text.trim();
     final password = _passCtrl.text;
 
@@ -49,7 +53,7 @@ class _LoginScreenState extends State<LoginScreen> {
       return;
     }
 
-    if (!email.contains('@')) {
+    if (!RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$').hasMatch(email)) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Please enter a valid email address.'),
@@ -59,21 +63,84 @@ class _LoginScreenState extends State<LoginScreen> {
     }
 
     setState(() => _isLoading = true);
-
+    var loginSucceeded = false;
     try {
-      await _authService.signInWithEmail(email: email, password: password);
-    } catch (e) {
-      debugPrint('Firebase login notice: $e');
+      final response = await _authService.signInWithEmail(
+        email: email,
+        password: password,
+      );
+      final user = response.user;
+      if (user == null || response.session == null) {
+        _showLoginError('We could not start a session. Please try again.');
+      } else {
+        final profile = await _authService.getProfile(user.id);
+        final role = profile?['role'];
+        final displayName = profile?['display_name'];
+        if (profile == null ||
+            (role != 'buyer' && role != 'seller') ||
+            displayName is! String ||
+            displayName.trim().isEmpty) {
+          await _authService.signOut();
+          _showLoginError(
+            'Your account profile is missing or incomplete. Please contact '
+            'the project team.',
+          );
+        } else {
+          loginSucceeded = true;
+        }
+      }
+    } on AuthRetryableFetchException {
+      _showLoginError(
+        'Could not reach Supabase. Check your internet connection and try again.',
+      );
+    } on AuthApiException catch (error) {
+      _showLoginError(_loginErrorMessage(error.code));
+      debugPrint('Supabase login failed with code: ${error.code ?? 'none'}');
+    } on AuthException {
+      _showLoginError('We could not sign you in. Please try again.');
+    } catch (error) {
+      _showLoginError('We could not complete sign-in. Check your connection.');
+      debugPrint('Supabase login failed with ${error.runtimeType}.');
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
 
-    if (!mounted) return;
+    if (!loginSucceeded || !mounted) return;
+    if (widget.returnToCaller) {
+      Navigator.of(context).pop(true);
+      return;
+    }
     Navigator.of(context).pushReplacement(
       MaterialPageRoute(
         builder: (_) => const LocationOnboardingScreen(),
       ),
     );
+  }
+
+  String _loginErrorMessage(String? code) {
+    switch (code) {
+      case 'invalid_credentials':
+      case 'user_not_found':
+        return 'Email or password is incorrect.';
+      case 'over_request_rate_limit':
+        return 'Too many sign-in attempts. Wait a few minutes and try again.';
+      case 'user_banned':
+        return 'This account is temporarily unavailable. Contact the project team.';
+      default:
+        return 'We could not sign you in. Please check your details and try again.';
+    }
+  }
+
+  void _showLoginError(String message) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(
+          content: Text(message),
+          backgroundColor: const Color(0xFFB42318),
+        ),
+      );
   }
 
   @override
@@ -187,49 +254,27 @@ class _LoginScreenState extends State<LoginScreen> {
             ),
           ),
           const SizedBox(height: 14),
-          Row(
-            children: [
-              SizedBox(
-                width: 22,
-                height: 22,
-                child: Checkbox(
-                  value: _remember,
-                  onChanged: (v) => setState(() => _remember = v ?? false),
-                  visualDensity: VisualDensity.compact,
-                  materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(6),
+          Align(
+            alignment: Alignment.centerRight,
+            child: GestureDetector(
+              onTap: () {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text(
+                      'Password reset is not available in this prototype yet.',
+                    ),
                   ),
-                  side: const BorderSide(color: Color(0xFFE2DFF2), width: 1.2),
-                  fillColor: WidgetStateProperty.resolveWith(
-                    (states) => states.contains(WidgetState.selected)
-                        ? _green
-                        : _fieldBg,
-                  ),
+                );
+              },
+              child: Text(
+                'Forgot password?',
+                style: GoogleFonts.plusJakartaSans(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                  color: _ink,
                 ),
               ),
-              const SizedBox(width: 10),
-              Text(
-                'Remember me',
-                style: GoogleFonts.plusJakartaSans(fontSize: 12, color: _ink),
-              ),
-              const Spacer(),
-              GestureDetector(
-                onTap: () {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Password reset link will be sent to your email.')),
-                  );
-                },
-                child: Text(
-                  'Forgot password?',
-                  style: GoogleFonts.plusJakartaSans(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w700,
-                    color: _ink,
-                  ),
-                ),
-              ),
-            ],
+            ),
           ),
           const SizedBox(height: 18),
           SizedBox(
