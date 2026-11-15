@@ -2,11 +2,10 @@ import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:firebase_auth/firebase_auth.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../../ai_grading/presentation/screens/ai_grading_result_screen.dart';
-import '../../../../core/services/firestore_product_service.dart';
-import '../../../../core/services/firebase_storage_service.dart';
+import '../../../../core/services/supabase_product_service.dart';
 
 const Color _green = Color(0xFF14532D);
 const Color _darkTeal = Color(0xFF0E3436);
@@ -24,8 +23,7 @@ class AddProductScreen extends StatefulWidget {
 
 class _AddProductScreenState extends State<AddProductScreen> {
   final ImagePicker _picker = ImagePicker();
-  final FirestoreProductService _productService = FirestoreProductService();
-  final FirebaseStorageService _storageService = FirebaseStorageService();
+  final SupabaseProductService _productService = SupabaseProductService();
 
   final _formKey = GlobalKey<FormState>();
   final _titleController = TextEditingController();
@@ -35,13 +33,22 @@ class _AddProductScreenState extends State<AddProductScreen> {
   final _locationController =
       TextEditingController(text: 'Kec. Lowokwaru, Malang');
 
-  final List<Uint8List> _photos = [];
+  final List<ProductPhotoUpload> _photos = [];
   String _selectedCategory = 'T-Shirt';
   String _selectedSize = 'M';
-  String? _grade = 'Grade A • Like New';
+  String? _grade;
+  String? _aiGrade;
+  String? _finalGrade;
+  double? _aiConfidence;
   bool _pickingPhoto = false;
   bool _isPublishing = false;
   int _currentStep = 1; // 1: Photos & Category, 2: Condition, 3: Details
+
+  String? _gradeCode(String? label) {
+    final match = RegExp(r'Grade\s+([ABCD])', caseSensitive: false)
+        .firstMatch(label ?? '');
+    return match?.group(1)?.toUpperCase();
+  }
 
   @override
   void dispose() {
@@ -59,19 +66,40 @@ class _AddProductScreenState extends State<AddProductScreen> {
     try {
       final remaining = 6 - _photos.length;
       if (source == ImageSource.gallery) {
-        final selected = await _picker.pickMultiImage(imageQuality: 85);
+        final selected = await _picker.pickMultiImage(
+          limit: remaining,
+          maxWidth: 1600,
+          maxHeight: 1600,
+          imageQuality: 82,
+        );
         if (!mounted || selected.isEmpty) return;
-        final photos = await Future.wait(
+        final pickedBytes = await Future.wait(
           selected.take(remaining).map((photo) => photo.readAsBytes()),
         );
         if (!mounted) return;
-        setState(() => _photos.addAll(photos));
+        final accepted = <ProductPhotoUpload>[];
+        for (final bytes in pickedBytes) {
+          final photo = _photoUploadFromBytes(bytes);
+          if (photo != null) accepted.add(photo);
+        }
+        setState(() => _photos.addAll(accepted));
+        if (accepted.length != pickedBytes.length) _showPhotoFormatNotice();
       } else {
-        final photo = await _picker.pickImage(source: source, imageQuality: 85);
+        final photo = await _picker.pickImage(
+          source: source,
+          maxWidth: 1600,
+          maxHeight: 1600,
+          imageQuality: 82,
+        );
         if (!mounted || photo == null) return;
         final bytes = await photo.readAsBytes();
         if (!mounted) return;
-        setState(() => _photos.add(bytes));
+        final upload = _photoUploadFromBytes(bytes);
+        if (upload == null) {
+          _showPhotoFormatNotice();
+        } else {
+          setState(() => _photos.add(upload));
+        }
       }
     } catch (_) {
       if (mounted) {
@@ -84,6 +112,49 @@ class _AddProductScreenState extends State<AddProductScreen> {
     } finally {
       if (mounted) setState(() => _pickingPhoto = false);
     }
+  }
+
+  ProductPhotoUpload? _photoUploadFromBytes(Uint8List bytes) {
+    if (bytes.length > 5 * 1024 * 1024) return null;
+    if (bytes.length >= 3 &&
+        bytes[0] == 0xff &&
+        bytes[1] == 0xd8 &&
+        bytes[2] == 0xff) {
+      return ProductPhotoUpload(
+        bytes: bytes,
+        extension: 'jpg',
+        contentType: 'image/jpeg',
+      );
+    }
+    const pngSignature = [137, 80, 78, 71, 13, 10, 26, 10];
+    if (bytes.length >= pngSignature.length &&
+        List<int>.generate(pngSignature.length, (index) => bytes[index])
+            .join(',') ==
+            pngSignature.join(',')) {
+      return ProductPhotoUpload(
+        bytes: bytes,
+        extension: 'png',
+        contentType: 'image/png',
+      );
+    }
+    if (bytes.length >= 12 &&
+        String.fromCharCodes(bytes.sublist(0, 4)) == 'RIFF' &&
+        String.fromCharCodes(bytes.sublist(8, 12)) == 'WEBP') {
+      return ProductPhotoUpload(
+        bytes: bytes,
+        extension: 'webp',
+        contentType: 'image/webp',
+      );
+    }
+    return null;
+  }
+
+  void _showPhotoFormatNotice() {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Use JPEG, PNG, or WebP photos up to 5 MB each.'),
+      ),
+    );
   }
 
   Future<void> _showPhotoPicker() async {
@@ -128,7 +199,9 @@ class _AddProductScreenState extends State<AddProductScreen> {
     final result = await Navigator.of(context).push<dynamic>(
       MaterialPageRoute(
         builder: (_) => AiGradingResultScreen(
-          imageBytes: List<Uint8List>.unmodifiable(_photos),
+          imageBytes: List<Uint8List>.unmodifiable(
+            _photos.map((photo) => photo.bytes),
+          ),
           category: _selectedCategory,
         ),
       ),
@@ -137,13 +210,19 @@ class _AddProductScreenState extends State<AddProductScreen> {
     if (!mounted || result == null) return;
     setState(() {
       if (result is Map) {
-        _grade = result['grade'] as String? ?? _grade;
+        _grade = result['grade'] as String?;
+        _aiGrade = result['aiGrade'] as String?;
+        _aiConfidence = (result['aiConfidence'] as num?)?.toDouble();
+        _finalGrade = result['finalGrade'] as String?;
         if (result['category'] != null &&
             (result['category'] as String).isNotEmpty) {
           _selectedCategory = result['category'] as String;
         }
       } else if (result is String) {
         _grade = result;
+        _finalGrade = _gradeCode(result);
+        _aiGrade = null;
+        _aiConfidence = null;
       }
       _currentStep = 3; // Advance to Step 3: Details & Publish
     });
@@ -151,9 +230,14 @@ class _AddProductScreenState extends State<AddProductScreen> {
 
   Future<void> _publishListing() async {
     if (!_formKey.currentState!.validate()) return;
-    if (_photos.isEmpty) {
+    if (_photos.isEmpty ||
+        _aiGrade == null ||
+        _aiConfidence == null ||
+        _finalGrade == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please add at least one photo.')),
+        const SnackBar(
+          content: Text('Complete the AI condition review before publishing.'),
+        ),
       );
       setState(() => _currentStep = 1);
       return;
@@ -162,54 +246,25 @@ class _AddProductScreenState extends State<AddProductScreen> {
     setState(() => _isPublishing = true);
 
     try {
-      final user = FirebaseAuth.instance.currentUser;
-      final sellerId = user?.uid ?? 'guest_seller';
-      final sellerName = user?.displayName ?? 'Community Seller';
-
-      // 1. Upload photos to Firebase Storage if available
-      final List<String> imageUrls = [];
-      for (int i = 0; i < _photos.length; i++) {
-        try {
-          final url = await _storageService.uploadProductImage(
-            bytes: _photos[i],
-            userId: sellerId,
-            fileName: 'item_${DateTime.now().millisecondsSinceEpoch}_$i',
-          );
-          imageUrls.add(url);
-        } catch (storageError) {
-          debugPrint('Storage upload fallback: $storageError');
-        }
+      final userId = Supabase.instance.client.auth.currentUser?.id;
+      if (userId == null) {
+        throw StateError('Your session ended. Please log in and try again.');
       }
 
-      // Fallback fallback sample image if storage failed or mock
-      if (imageUrls.isEmpty) {
-        imageUrls.add(
-          _selectedCategory == 'Jacket'
-              ? 'https://images.unsplash.com/photo-1551028719-00167b16eac5?w=800'
-              : _selectedCategory == 'Shirt'
-                  ? 'https://images.unsplash.com/photo-1596755094514-f87e34085b2c?w=800'
-                  : _selectedCategory == 'Pants'
-                      ? 'https://images.unsplash.com/photo-1624378439575-d8705ad7ae80?w=800'
-                      : 'https://images.unsplash.com/photo-1521572267360-ee0c2909d518?w=800',
-        );
-      }
-
-      final priceInt =
-          int.tryParse(_priceController.text.replaceAll(RegExp(r'[^0-9]'), '')) ??
-              50000;
-
-      // 2. Save directly to Cloud Firestore
+      final priceInt = int.parse(_priceController.text.trim());
       await _productService.createProduct(
-        sellerId: sellerId,
-        sellerName: sellerName,
+        sellerId: userId,
         name: _titleController.text.trim(),
         brand: _brandController.text.trim(),
+        size: _selectedSize,
         price: priceInt,
         category: _selectedCategory,
-        grade: _grade ?? 'Grade A • Like New',
+        aiGrade: _aiGrade!,
+        aiConfidence: _aiConfidence!,
+        finalGrade: _finalGrade!,
+        photos: List<ProductPhotoUpload>.unmodifiable(_photos),
         description: _descriptionController.text.trim(),
-        imageUrls: imageUrls,
-        locationName: _locationController.text.trim(),
+        pickupLocation: _locationController.text.trim(),
         latitude: -7.9465,
         longitude: 112.6156,
       );
@@ -217,27 +272,31 @@ class _AddProductScreenState extends State<AddProductScreen> {
       if (!mounted) return;
 
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
+        const SnackBar(
           content: Row(
-            children: const [
+            children: [
               Icon(Icons.check_circle_outline, color: Colors.white),
               SizedBox(width: 8),
               Expanded(
-                child: Text('Listing published to Firestore successfully!'),
+                child: Text('Listing published successfully!'),
               ),
             ],
           ),
           backgroundColor: _green,
-          duration: const Duration(seconds: 3),
+          duration: Duration(seconds: 3),
         ),
       );
 
       Navigator.of(context).pop(true);
-    } catch (e) {
+    } catch (error) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Failed to publish listing: $e'),
+            content: Text(
+              error is ProductPublishException
+                  ? error.message
+                  : 'Could not publish. Your form is still here; check your connection and try again.',
+            ),
             backgroundColor: Colors.red.shade700,
           ),
         );
@@ -410,7 +469,7 @@ class _AddProductScreenState extends State<AddProductScreen> {
               child: Stack(
                 fit: StackFit.expand,
                 children: [
-                  Image.memory(_photos[index], fit: BoxFit.cover),
+                  Image.memory(_photos[index].bytes, fit: BoxFit.cover),
                   Positioned(
                     top: 4,
                     right: 4,
@@ -516,7 +575,7 @@ class _AddProductScreenState extends State<AddProductScreen> {
                         ),
                       ),
                       Text(
-                        _grade ?? 'Grade A',
+                        _grade ?? 'Complete condition review first',
                         style: GoogleFonts.plusJakartaSans(
                           fontSize: 14,
                           fontWeight: FontWeight.w800,
@@ -529,6 +588,25 @@ class _AddProductScreenState extends State<AddProductScreen> {
                 TextButton(
                   onPressed: _goToConditionReview,
                   child: const Text('Change'),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 18),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: _line),
+            ),
+            child: const Row(
+              children: [
+                Icon(Icons.cloud_upload_outlined, color: _muted),
+                SizedBox(width: 8),
+                Expanded(
+                  child: Text('Photos upload securely when you publish this listing.'),
                 ),
               ],
             ),
@@ -569,9 +647,12 @@ class _AddProductScreenState extends State<AddProductScreen> {
                       controller: _priceController,
                       keyboardType: TextInputType.number,
                       decoration: _inputDecoration('e.g. 120000'),
-                      validator: (v) => v == null || v.trim().isEmpty
-                          ? 'Enter price'
-                          : null,
+                      validator: (v) {
+                        final price = int.tryParse(v?.trim() ?? '');
+                        if (price == null) return 'Enter a whole-number price';
+                        if (price <= 0) return 'Price must be greater than 0';
+                        return null;
+                      },
                     ),
                   ],
                 ),
@@ -606,6 +687,9 @@ class _AddProductScreenState extends State<AddProductScreen> {
           TextFormField(
             controller: _locationController,
             decoration: _inputDecoration('e.g. Lowokwaru / Suhat Malang'),
+            validator: (v) => v == null || v.trim().isEmpty
+                ? 'Enter a pickup location'
+                : null,
           ),
           const SizedBox(height: 28),
           SizedBox(

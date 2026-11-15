@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:thrifty/features/product_detail/presentation/screens/product_detail.dart';
+import '../../../../core/models/product_model.dart';
+import '../../../../core/services/supabase_product_service.dart';
 
 const Color _green = Color(0xFF006400);
 const Color _background = Color(0xFFF8F9FB);
@@ -17,18 +20,17 @@ class FilterSearchScreen extends StatefulWidget {
 
 class _FilterSearchScreenState extends State<FilterSearchScreen> {
   final TextEditingController _searchController =
-      TextEditingController(text: 'denim');
+      TextEditingController();
 
-  double _radiusValue = 5;
-  double _priceValue = 75000;
-  int _selectedPriceChip = 1;
-  String _selectedCategory = 'Jacket';
+  double _priceValue = 1000000;
+  int _selectedPriceChip = 2;
+  String _selectedCategory = 'All';
 
   final Map<String, bool> _conditions = {
     'Grade A': true,
     'Grade B': true,
-    'Grade C': false,
-    'Grade D': false,
+    'Grade C': true,
+    'Grade D': true,
   };
 
   @override
@@ -44,9 +46,8 @@ class _FilterSearchScreenState extends State<FilterSearchScreen> {
         builder: (_) => SearchResultsScreen(
           query: _searchController.text,
           category: _selectedCategory,
-          maxPrice: _priceValue,
+          maxPrice: _selectedPriceChip == 2 ? double.infinity : _priceValue,
           conditions: Map<String, bool>.from(_conditions),
-          radius: _radiusValue,
         ),
       ),
     );
@@ -54,13 +55,11 @@ class _FilterSearchScreenState extends State<FilterSearchScreen> {
 
   void _resetFilters() {
     setState(() {
-      _searchController.text = 'denim';
-      _radiusValue = 5;
-      _priceValue = 75000;
-      _selectedPriceChip = 1;
-      _selectedCategory = 'Jacket';
-      _conditions.updateAll((key, value) =>
-          key == 'Grade A' || key == 'Grade B');
+      _searchController.clear();
+      _priceValue = 1000000;
+      _selectedPriceChip = 2;
+      _selectedCategory = 'All';
+      _conditions.updateAll((key, value) => true);
     });
   }
 
@@ -166,46 +165,18 @@ class _FilterSearchScreenState extends State<FilterSearchScreen> {
                 Icon(Icons.near_me, size: 15, color: _green),
                 SizedBox(width: 6),
                 Text(
-                  'Browsing near South Jakarta',
+                  'Search active listings by their saved item details',
                   style: TextStyle(fontSize: 12, color: Colors.black54),
                 ),
               ],
             ),
             const SizedBox(height: 18),
 
-            // SEARCH RADIUS
+            // DISTANCE NOTE
             _sectionCard(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  _cardTitle(
-                    Icons.radar,
-                    'Search radius',
-                    '${_radiusValue.toInt()} km',
-                  ),
-                  const SizedBox(height: 6),
-                  const Text(
-                    'Showing vintage shops and sellers within your selected radius.',
-                    style: TextStyle(fontSize: 12, color: Colors.grey),
-                  ),
-                  Slider(
-                    value: _radiusValue,
-                    min: 1,
-                    max: 10,
-                    activeColor: _green,
-                    onChanged: (value) {
-                      setState(() => _radiusValue = value);
-                    },
-                  ),
-                  const Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text('1 km'),
-                      Text('5 km'),
-                      Text('10 km'),
-                    ],
-                  ),
-                ],
+              child: const Text(
+                'Distance filtering is not available yet. Search uses item details, category, price, and condition.',
+                style: TextStyle(fontSize: 12, color: Colors.grey),
               ),
             ),
             const SizedBox(height: 16),
@@ -225,20 +196,21 @@ class _FilterSearchScreenState extends State<FilterSearchScreen> {
                     children: [
                       _priceChip(0, 'Under 100k'),
                       const SizedBox(width: 6),
-                      _priceChip(1, '100k–150k'),
+                      _priceChip(1, 'Up to 150k'),
                       const SizedBox(width: 6),
-                      _priceChip(2, '150k+'),
+                      _priceChip(2, 'Any price'),
                     ],
                   ),
                   Slider(
                     value: _priceValue,
                     min: 0,
-                    max: 150000,
-                    divisions: 30,
+                    max: 1000000,
+                    divisions: 50,
                     activeColor: _green,
                     onChanged: (value) {
                       setState(() {
                         _priceValue = value;
+                        _selectedPriceChip = -1;
                       });
                     },
                   ),
@@ -258,7 +230,7 @@ class _FilterSearchScreenState extends State<FilterSearchScreen> {
                         ),
                       ),
                       const Text(
-                        'Rp 150.000',
+                        'Rp 1.000.000',
                         style: TextStyle(fontSize: 11),
                       ),
                     ],
@@ -287,6 +259,7 @@ class _FilterSearchScreenState extends State<FilterSearchScreen> {
               crossAxisSpacing: 10,
               mainAxisSpacing: 10,
               children: [
+                _categoryCard('All', Icons.apps),
                 _categoryCard('Shirt', Icons.checkroom),
                 _categoryCard('T-Shirt', Icons.dry_cleaning),
                 _categoryCard('Pants', Icons.shopping_bag),
@@ -296,52 +269,34 @@ class _FilterSearchScreenState extends State<FilterSearchScreen> {
             const SizedBox(height: 20),
 
             // CONDITION
-            const Row(
-              children: [
-                Text(
-                  'CONDITION',
-                  style: TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.grey,
-                    letterSpacing: 0.5,
-                  ),
-                ),
-                SizedBox(width: 8),
-                Icon(Icons.auto_awesome, color: Colors.blue, size: 14),
-                Text(
-                  'AI VERIFIED',
-                  style: TextStyle(
-                    fontSize: 9,
-                    color: Colors.blue,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ],
+            const Text(
+              'CONDITION GRADE',
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.bold,
+                color: Colors.grey,
+                letterSpacing: 0.5,
+              ),
             ),
             const SizedBox(height: 10),
             _conditionCard(
               'Grade A',
-              '9/10',
-              'Excellent condition, minimal signs of wear',
+              'Like New',
             ),
             const SizedBox(height: 8),
             _conditionCard(
               'Grade B',
-              '7–8/10',
-              'Good vintage patina, gentle authentic wear',
+              'Very Good',
             ),
             const SizedBox(height: 8),
             _conditionCard(
               'Grade C',
-              '5–6/10',
-              'Fair condition, visible distressed character',
+              'Good / Usable',
             ),
             const SizedBox(height: 8),
             _conditionCard(
               'Grade D',
-              'Upcycle',
-              'Raw project piece, ideal for DIY reconstruction',
+              'Significant Wear',
             ),
             const SizedBox(height: 100),
           ],
@@ -457,7 +412,7 @@ class _FilterSearchScreenState extends State<FilterSearchScreen> {
             } else if (index == 1) {
               _priceValue = 150000;
             } else {
-              _priceValue = 150000;
+              _priceValue = 1000000;
             }
           });
         },
@@ -521,7 +476,7 @@ class _FilterSearchScreenState extends State<FilterSearchScreen> {
     );
   }
 
-  Widget _conditionCard(String grade, String score, String description) {
+  Widget _conditionCard(String grade, String description) {
     final selected = _conditions[grade] ?? false;
 
     return InkWell(
@@ -570,14 +525,6 @@ class _FilterSearchScreenState extends State<FilterSearchScreen> {
                           fontSize: 13,
                         ),
                       ),
-                      const SizedBox(width: 6),
-                      Text(
-                        score,
-                        style: const TextStyle(
-                          fontSize: 11,
-                          color: Colors.grey,
-                        ),
-                      ),
                     ],
                   ),
                   const SizedBox(height: 3),
@@ -611,12 +558,11 @@ class _FilterSearchScreenState extends State<FilterSearchScreen> {
 // HALAMAN HASIL PENCARIAN
 // ============================================================
 
-class SearchResultsScreen extends StatelessWidget {
+class SearchResultsScreen extends StatefulWidget {
   final String query;
   final String category;
   final double maxPrice;
   final Map<String, bool> conditions;
-  final double radius;
 
   const SearchResultsScreen({
     super.key,
@@ -624,69 +570,24 @@ class SearchResultsScreen extends StatelessWidget {
     required this.category,
     required this.maxPrice,
     required this.conditions,
-    required this.radius,
   });
 
-  // Data contoh lokal untuk tampilan.
-  // Nantinya dapat diganti dengan data dari backend/API.
-  static const List<Map<String, dynamic>> _products = [
-    {
-      'name': 'Vintage Denim Jacket',
-      'price': 89000,
-      'grade': 'Grade A',
-      'category': 'Jacket',
-      'location': 'South Jakarta',
-      'image':
-          'https://images.unsplash.com/photo-1551028719-00167b16eac5?w=700',
-    },
-    {
-      'name': 'Classic Denim Jacket',
-      'price': 120000,
-      'grade': 'Grade B',
-      'category': 'Jacket',
-      'location': 'Central Jakarta',
-      'image':
-          'https://images.unsplash.com/photo-1543076447-215ad9ba6923?w=700',
-    },
-    {
-      'name': 'Vintage Cotton Shirt',
-      'price': 65000,
-      'grade': 'Grade A',
-      'category': 'Shirt',
-      'location': 'South Jakarta',
-      'image':
-          'https://images.unsplash.com/photo-1598033129183-c4f50c736f10?w=700',
-    },
-    {
-      'name': 'Vintage Denim Pants',
-      'price': 95000,
-      'grade': 'Grade B',
-      'category': 'Pants',
-      'location': 'West Jakarta',
-      'image':
-          'https://images.unsplash.com/photo-1542272604-787c3835535d?w=700',
-    },
-  ];
+  @override
+  State<SearchResultsScreen> createState() => _SearchResultsScreenState();
+}
+
+class _SearchResultsScreenState extends State<SearchResultsScreen> {
+  final SupabaseProductService _productService = SupabaseProductService();
+  late Future<List<ProductModel>> _productsFuture;
+
+  @override
+  void initState() {
+    super.initState();
+    _productsFuture = _productService.fetchActiveProducts();
+  }
 
   @override
   Widget build(BuildContext context) {
-    final normalizedQuery = query.trim().toLowerCase();
-
-    final filteredProducts = _products.where((product) {
-      final matchesQuery = normalizedQuery.isEmpty ||
-          product['name'].toString().toLowerCase().contains(normalizedQuery);
-
-      final matchesCategory = product['category'] == category;
-      final matchesPrice = (product['price'] as int) <= maxPrice;
-      final matchesCondition =
-          conditions[product['grade']] ?? false;
-
-      return matchesQuery &&
-          matchesCategory &&
-          matchesPrice &&
-          matchesCondition;
-    }).toList();
-
     return Scaffold(
       backgroundColor: _background,
       appBar: AppBar(
@@ -699,171 +600,117 @@ class SearchResultsScreen extends StatelessWidget {
           ),
         ),
       ),
-      body: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              '${filteredProducts.length} products found',
-              style: const TextStyle(
-                color: Colors.black54,
-                fontSize: 14,
+      body: FutureBuilder<List<ProductModel>>(
+        future: _productsFuture,
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Center(child: CircularProgressIndicator());
+          }
+          if (snapshot.hasError) {
+            return Center(
+              child: Padding(
+                padding: const EdgeInsets.all(24),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Text('Could not load listings. Check your connection and try again.'),
+                    const SizedBox(height: 12),
+                    ElevatedButton(
+                      onPressed: () => setState(() {
+                        _productsFuture = _productService.fetchActiveProducts();
+                      }),
+                      child: const Text('Retry'),
+                    ),
+                  ],
+                ),
               ),
-            ),
-            const SizedBox(height: 14),
-            Expanded(
-              child: filteredProducts.isEmpty
-                  ? const Center(
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(
-                            Icons.search_off,
-                            size: 60,
-                            color: Colors.grey,
-                          ),
-                          SizedBox(height: 12),
-                          Text(
-                            'No products found',
-                            style: TextStyle(
-                              fontSize: 17,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                          SizedBox(height: 6),
-                          Text(
-                            'Try changing your search or filters.',
-                            style: TextStyle(color: Colors.grey),
-                          ),
-                        ],
-                      ),
-                    )
-                  : GridView.builder(
-                      itemCount: filteredProducts.length,
-                      gridDelegate:
-                          const SliverGridDelegateWithFixedCrossAxisCount(
-                        crossAxisCount: 2,
-                        crossAxisSpacing: 12,
-                        mainAxisSpacing: 12,
-                        childAspectRatio: 0.62,
-                      ),
-                      itemBuilder: (context, index) {
-                        final product = filteredProducts[index];
+            );
+          }
 
-                        return InkWell(
-                          borderRadius: BorderRadius.circular(14),
-                          onTap: () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (_) =>
-                                    const ProductDetailScreen(),
+          final allProducts = snapshot.data ?? const <ProductModel>[];
+          final normalizedQuery = widget.query.trim().toLowerCase();
+          final filteredProducts = allProducts.where((product) {
+            final searchable = '${product.name} ${product.brand} ${product.category} ${product.pickupLocation}'.toLowerCase();
+            final matchesQuery = normalizedQuery.isEmpty || searchable.contains(normalizedQuery);
+            final matchesCategory = widget.category == 'All' || product.category == widget.category;
+            final matchesPrice = product.price <= widget.maxPrice;
+            final matchesCondition = widget.conditions[product.grade] ?? false;
+            return matchesQuery && matchesCategory && matchesPrice && matchesCondition;
+          }).toList(growable: false);
+
+          return Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('${filteredProducts.length} listings found', style: const TextStyle(color: Colors.black54, fontSize: 14)),
+                const SizedBox(height: 10),
+                const Text('Distance filtering is unavailable; pickup locations are shown on each listing.', style: TextStyle(color: Colors.black45, fontSize: 12)),
+                const SizedBox(height: 14),
+                Expanded(
+                  child: filteredProducts.isEmpty
+                      ? const Center(
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(Icons.search_off, size: 60, color: Colors.grey),
+                              SizedBox(height: 12),
+                              Text('No listings match these filters', style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold)),
+                              SizedBox(height: 6),
+                              Text('Try changing your search or filters.', style: TextStyle(color: Colors.grey)),
+                            ],
+                          ),
+                        )
+                      : GridView.builder(
+                          itemCount: filteredProducts.length,
+                          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 2, crossAxisSpacing: 12, mainAxisSpacing: 12, childAspectRatio: 0.62),
+                          itemBuilder: (context, index) {
+                            final product = filteredProducts[index];
+                            return InkWell(
+                              borderRadius: BorderRadius.circular(14),
+                              onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => ProductDetailScreen(product: ProductDetailsData.fromModel(product)))),
+                              child: Container(
+                                decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(14), border: Border.all(color: Colors.grey.shade200)),
+                                clipBehavior: Clip.antiAlias,
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Expanded(
+                                      child: SizedBox(
+                                        width: double.infinity,
+                                        child: product.imageUrls.isEmpty
+                                            ? const Center(child: Text('No photo', style: TextStyle(color: Colors.grey)))
+                                            : CachedNetworkImage(
+                                                imageUrl: product.imageUrls.first,
+                                                fit: BoxFit.cover,
+                                                placeholder: (_, __) => const Center(child: CircularProgressIndicator()),
+                                                errorWidget: (_, __, ___) => const Center(child: Text('No photo', style: TextStyle(color: Colors.grey))),
+                                              ),
+                                      ),
+                                    ),
+                                    Padding(
+                                      padding: const EdgeInsets.all(10),
+                                      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                                        Text(product.name, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                                        const SizedBox(height: 6),
+                                        Text(product.formattedPrice, style: const TextStyle(color: _green, fontWeight: FontWeight.bold, fontSize: 14)),
+                                        const SizedBox(height: 5),
+                                        Text(product.grade, style: const TextStyle(color: Colors.grey, fontSize: 11)),
+                                        const SizedBox(height: 5),
+                                        Text(product.pickupLocation.isEmpty ? 'Pickup location unavailable' : product.pickupLocation, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.grey, fontSize: 10)),
+                                      ]),
+                                    ),
+                                  ],
+                                ),
                               ),
                             );
                           },
-                          child: Container(
-                            decoration: BoxDecoration(
-                              color: Colors.white,
-                              borderRadius: BorderRadius.circular(14),
-                              border: Border.all(
-                                color: Colors.grey.shade200,
-                              ),
-                            ),
-                            clipBehavior: Clip.antiAlias,
-                            child: Column(
-                              crossAxisAlignment:
-                                  CrossAxisAlignment.start,
-                              children: [
-                                Expanded(
-                                  child: SizedBox(
-                                    width: double.infinity,
-                                    child: Image.network(
-                                      product['image'].toString(),
-                                      fit: BoxFit.cover,
-                                      errorBuilder:
-                                          (context, error, stackTrace) {
-                                        return Container(
-                                          color: Colors.grey.shade200,
-                                          child: const Center(
-                                            child: Icon(
-                                              Icons.checkroom,
-                                              size: 48,
-                                              color: Colors.grey,
-                                            ),
-                                          ),
-                                        );
-                                      },
-                                    ),
-                                  ),
-                                ),
-                                Padding(
-                                  padding: const EdgeInsets.all(10),
-                                  child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        product['name'].toString(),
-                                        maxLines: 2,
-                                        overflow: TextOverflow.ellipsis,
-                                        style: const TextStyle(
-                                          fontWeight: FontWeight.bold,
-                                          fontSize: 13,
-                                        ),
-                                      ),
-                                      const SizedBox(height: 6),
-                                      Text(
-                                        'Rp ${(product['price'] as int).toString()}',
-                                        style: const TextStyle(
-                                          color: _green,
-                                          fontWeight: FontWeight.bold,
-                                          fontSize: 14,
-                                        ),
-                                      ),
-                                      const SizedBox(height: 5),
-                                      Text(
-                                        product['grade'].toString(),
-                                        style: const TextStyle(
-                                          color: Colors.grey,
-                                          fontSize: 11,
-                                        ),
-                                      ),
-                                      const SizedBox(height: 5),
-                                      Row(
-                                        children: [
-                                          const Icon(
-                                            Icons.location_on_outlined,
-                                            size: 12,
-                                            color: Colors.grey,
-                                          ),
-                                          const SizedBox(width: 3),
-                                          Expanded(
-                                            child: Text(
-                                              product['location'].toString(),
-                                              maxLines: 1,
-                                              overflow:
-                                                  TextOverflow.ellipsis,
-                                              style: const TextStyle(
-                                                color: Colors.grey,
-                                                fontSize: 10,
-                                              ),
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        );
-                      },
-                    ),
+                        ),
+                ),
+              ],
             ),
-          ],
-        ),
+          );
+        },
       ),
     );
   }

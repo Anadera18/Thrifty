@@ -1,14 +1,18 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../../../auth/presentation/providers/auth_state_providers.dart';
+import '../../../auth/presentation/widgets/seller_only_gate.dart';
 import '../../../auth/presentation/screens/login_screen.dart';
 import '../../../home/presentation/screens/home_screen.dart';
 import '../../../my_listings/presentation/screens/my_listings_screen.dart';
+import '../../../onboarding/presentation/screens/welcome_flow.dart';
 import '../../../product_detail/presentation/screens/product_detail.dart';
 import '../../../saved_items/presentation/screens/saved_items_screen.dart';
 import '../../../settings/presentation/screens/settings_screen.dart';
 import '../../../help_center/presentation/screens/help_center_screen.dart';
-import '../state/account_mode_store.dart';
 
 const _bg = Color(0xFFFBF9FF);
 const _surface = Colors.white;
@@ -19,24 +23,24 @@ const _darkTeal = Color(0xFF0E3436);
 const _cyanSoft = Color(0xFFCFF5FA);
 const _line = Color(0xFFE5E3EF);
 
-class ProfileScreen extends StatefulWidget {
+class ProfileScreen extends ConsumerStatefulWidget {
   const ProfileScreen({super.key});
 
   @override
-  State<ProfileScreen> createState() => _ProfileScreenState();
+  ConsumerState<ProfileScreen> createState() => _ProfileScreenState();
 }
 
-class _ProfileScreenState extends State<ProfileScreen> {
+class _ProfileScreenState extends ConsumerState<ProfileScreen> {
+  bool _isSigningOut = false;
+
   @override
   void initState() {
     super.initState();
-    AccountModeStore.isSeller.addListener(_refresh);
     SavedProductsStore.items.addListener(_refresh);
   }
 
   @override
   void dispose() {
-    AccountModeStore.isSeller.removeListener(_refresh);
     SavedProductsStore.items.removeListener(_refresh);
     super.dispose();
   }
@@ -47,7 +51,34 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final isSeller = AccountModeStore.isSeller.value;
+    final user = ref.watch(currentSupabaseUserProvider);
+    final profileState = ref.watch(currentSupabaseProfileProvider);
+    final profile = profileState.when(
+      data: (row) => row,
+      loading: () => null,
+      error: (_, __) => null,
+    );
+    final role = profile?['role'];
+    final isSeller = role == 'seller';
+    final displayName = profile?['display_name'] is String
+        ? profile!['display_name'] as String
+        : user == null
+            ? 'Guest'
+            : 'Profile unavailable';
+    final email = user?.email ?? 'Browsing without an account';
+    final roleLabel = user == null
+        ? 'Guest access'
+        : profileState.isLoading
+            ? 'Loading account…'
+            : role == 'seller'
+                ? 'Seller account'
+                : role == 'buyer'
+                    ? 'Buyer account'
+                    : 'Account role unavailable';
+    final createdAt = DateTime.tryParse(profile?['created_at']?.toString() ?? '');
+    final memberLabel = createdAt == null
+        ? (user == null ? 'Browsing as a guest' : 'THRIFTY member')
+        : 'Member since ${createdAt.year}';
     return Scaffold(
       backgroundColor: _bg,
       appBar: AppBar(
@@ -77,22 +108,36 @@ class _ProfileScreenState extends State<ProfileScreen> {
         padding: const EdgeInsets.fromLTRB(18, 10, 18, 24),
         child: Column(
           children: [
-            _buildIdentityCard(context, isSeller),
+            _buildIdentityCard(
+              context,
+              isSeller,
+              displayName,
+              email,
+              roleLabel,
+              memberLabel,
+            ),
             const SizedBox(height: 14),
             _buildStatsRow(isSeller),
             const SizedBox(height: 14),
-            _buildAccountModeCard(context, isSeller),
+            _buildRoleCard(isSeller, roleLabel),
             const SizedBox(height: 14),
             _buildMenuCard(context, isSeller),
             const SizedBox(height: 16),
-            _buildLogoutButton(context),
+            _buildLogoutButton(context, user != null),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildIdentityCard(BuildContext context, bool isSeller) {
+  Widget _buildIdentityCard(
+    BuildContext context,
+    bool isSeller,
+    String displayName,
+    String email,
+    String roleLabel,
+    String memberLabel,
+  ) {
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(16),
@@ -114,7 +159,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 ),
                 alignment: Alignment.center,
                 child: Text(
-                  'DP',
+                  _initials(displayName),
                   style: GoogleFonts.plusJakartaSans(
                     fontSize: 22,
                     fontWeight: FontWeight.w800,
@@ -128,7 +173,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'Dinda Putri',
+                      displayName,
                       style: GoogleFonts.plusJakartaSans(
                         fontSize: 21,
                         fontWeight: FontWeight.w800,
@@ -136,7 +181,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       ),
                     ),
                     Text(
-                      'dinda.putri@atelier.com',
+                      email,
                       style: GoogleFonts.plusJakartaSans(
                         fontSize: 14,
                         color: _muted,
@@ -153,7 +198,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         borderRadius: BorderRadius.circular(999),
                       ),
                       child: Text(
-                        isSeller ? 'Seller account' : 'Buyer account',
+                        roleLabel,
                         style: GoogleFonts.plusJakartaSans(
                           fontSize: 12,
                           fontWeight: FontWeight.w700,
@@ -182,20 +227,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
           Row(
             children: [
               Text(
-                'Member since Oct 2023',
+                memberLabel,
                 style: GoogleFonts.plusJakartaSans(fontSize: 13, color: _muted),
               ),
               if (isSeller) ...[
                 const Spacer(),
-                Text(
-                  'TOP RATED',
-                  style: GoogleFonts.plusJakartaSans(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w800,
-                    color: _green,
-                    letterSpacing: 0.3,
-                  ),
-                ),
+                const Icon(Icons.verified_user_outlined, color: _green, size: 18),
               ],
             ],
           ),
@@ -224,24 +261,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
     return const Row(
       children: [
         Expanded(
-          child: _StatCard(value: '12', label: 'LISTINGS'),
+          child: _StatCard(value: 'Seller', label: 'ACCOUNT ROLE'),
         ),
         SizedBox(width: 10),
-        Expanded(
-          child: _StatCard(value: '8', label: 'SOLD'),
-        ),
-        SizedBox(width: 10),
-        Expanded(
-          child: _StatCard(value: '5 KM', label: 'RADIUS'),
-        ),
+        Expanded(child: _StatCard(value: 'Enabled', label: 'SELLER FEATURES')),
       ],
     );
   }
 
-  Widget _buildAccountModeCard(
-    BuildContext context,
-    bool isSeller,
-  ) => Container(
+  Widget _buildRoleCard(bool isSeller, String roleLabel) => Container(
     width: double.infinity,
     padding: const EdgeInsets.all(14),
     decoration: BoxDecoration(
@@ -259,7 +287,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
             borderRadius: BorderRadius.circular(12),
           ),
           child: Icon(
-            isSeller ? Icons.storefront_outlined : Icons.shopping_bag_outlined,
+            roleLabel == 'Guest access'
+                ? Icons.person_outline_rounded
+                : isSeller
+                    ? Icons.storefront_outlined
+                    : Icons.shopping_bag_outlined,
             color: _darkTeal,
           ),
         ),
@@ -269,7 +301,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'Account mode',
+                'Account role',
                 style: GoogleFonts.plusJakartaSans(
                   fontSize: 12,
                   fontWeight: FontWeight.w800,
@@ -278,29 +310,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
               ),
               const SizedBox(height: 2),
               Text(
-                isSeller ? 'Seller tools are enabled' : 'Shopping as a buyer',
+                roleLabel == 'Guest access'
+                    ? 'Log in to use a registered account.'
+                    : roleLabel == 'Account role unavailable'
+                        ? 'The account profile could not be loaded.'
+                        : isSeller
+                            ? 'Seller features follow your saved profile role.'
+                            : 'Buyer features follow your saved profile role.',
                 style: GoogleFonts.plusJakartaSans(fontSize: 10, color: _muted),
               ),
             ],
-          ),
-        ),
-        TextButton(
-          onPressed: () {
-            AccountModeStore.toggle();
-            _showMessage(
-              context,
-              isSeller
-                  ? 'Switched to buyer account.'
-                  : 'Switched to seller account.',
-            );
-          },
-          child: Text(
-            isSeller ? 'Switch to buyer' : 'Switch to seller',
-            style: GoogleFonts.plusJakartaSans(
-              fontSize: 10,
-              fontWeight: FontWeight.w800,
-              color: _darkTeal,
-            ),
           ),
         ),
       ],
@@ -322,10 +341,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
             _MenuTile(
               icon: Icons.inventory_2_outlined,
               title: 'My listings',
-              subtitle: '12 active & archived apparel',
-              trailing: '12',
+              subtitle: 'Manage your seller listings',
               onTap: () => Navigator.of(context).push(
-                MaterialPageRoute(builder: (_) => const MyListingsScreen()),
+                MaterialPageRoute(
+                  builder: (_) => const SellerOnlyGate(
+                    child: MyListingsScreen(),
+                  ),
+                ),
               ),
             ),
             const _MenuDivider(),
@@ -369,18 +391,22 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  Widget _buildLogoutButton(BuildContext context) {
+  Widget _buildLogoutButton(BuildContext context, bool isSignedIn) {
     return SizedBox(
       width: double.infinity,
       height: 52,
       child: OutlinedButton.icon(
-        onPressed: () => Navigator.of(context).pushAndRemoveUntil(
-          MaterialPageRoute(builder: (_) => const LoginScreen()),
-          (route) => false,
+        onPressed: _isSigningOut
+            ? null
+            : isSignedIn
+                ? _handleLogout
+                : () => _openLogin(context),
+        icon: Icon(
+          isSignedIn ? Icons.logout_rounded : Icons.login_rounded,
+          color: const Color(0xFFB91C1C),
         ),
-        icon: const Icon(Icons.logout_rounded, color: Color(0xFFB91C1C)),
         label: Text(
-          'Logout',
+          _isSigningOut ? 'Signing out…' : isSignedIn ? 'Logout' : 'Log in',
           style: GoogleFonts.plusJakartaSans(
             fontSize: 17,
             fontWeight: FontWeight.w700,
@@ -396,6 +422,36 @@ class _ProfileScreenState extends State<ProfileScreen> {
         ),
       ),
     );
+  }
+
+  Future<void> _handleLogout() async {
+    setState(() => _isSigningOut = true);
+    try {
+      await ref.read(supabaseAuthServiceProvider).signOut();
+      if (!mounted) return;
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute<void>(builder: (_) => const ThriftySplashScreen()),
+        (route) => false,
+      );
+    } on AuthException {
+      if (mounted) _showMessage(context, 'Could not log out. Please try again.');
+    } catch (_) {
+      if (mounted) _showMessage(context, 'Could not log out. Please try again.');
+    } finally {
+      if (mounted) setState(() => _isSigningOut = false);
+    }
+  }
+
+  void _openLogin(BuildContext context) {
+    Navigator.of(context).pushAndRemoveUntil(
+      MaterialPageRoute<void>(builder: (_) => const LoginScreen()),
+      (route) => false,
+    );
+  }
+
+  String _initials(String name) {
+    final parts = name.trim().split(RegExp(r'\s+')).where((part) => part.isNotEmpty);
+    return parts.take(2).map((part) => part[0].toUpperCase()).join();
   }
 
   void _showMessage(BuildContext context, String message) {
@@ -461,14 +517,12 @@ class _MenuTile extends StatelessWidget {
     required this.icon,
     required this.title,
     required this.subtitle,
-    this.trailing,
     required this.onTap,
   });
 
   final IconData icon;
   final String title;
   final String subtitle;
-  final String? trailing;
   final VoidCallback onTap;
 
   @override
@@ -496,29 +550,7 @@ class _MenuTile extends StatelessWidget {
         subtitle,
         style: GoogleFonts.plusJakartaSans(fontSize: 14, color: _muted),
       ),
-      trailing: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          if (trailing != null)
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-              decoration: BoxDecoration(
-                color: _cyanSoft,
-                borderRadius: BorderRadius.circular(999),
-              ),
-              child: Text(
-                trailing!,
-                style: GoogleFonts.plusJakartaSans(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w700,
-                  color: _darkTeal,
-                ),
-              ),
-            ),
-          const SizedBox(width: 5),
-          const Icon(Icons.chevron_right_rounded, size: 24, color: _muted),
-        ],
-      ),
+      trailing: const Icon(Icons.chevron_right_rounded, size: 24, color: _muted),
       onTap: onTap,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
     );

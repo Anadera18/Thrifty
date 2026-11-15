@@ -1,26 +1,12 @@
-cd D:\thrifty
+# Flutter / Dart generated files
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.packages
+.pub-cache/
+.pub/
+build/
+coverage/
 
-@"
-# Flutter / Dart
-frontend/.dart_tool/
-frontend/build/
-
-# Backend (later)
-backend/node_modules/
-backend/.env
-backend/uploads/*
-!backend/uploads/.gitkeep
-
-# ML (later)
-ml/.venv/
-ml/data/raw/*
-ml/data/processed/*
-ml/models/*
-!ml/**/.gitkeep
-
-# IDE / OS
-.idea/
-.vscode/
-.DS_Store
-Thumbs.db
-"@ | Set-Content .gitignore
+# Local Supabase client configuration. Keep the example file committed.
+/supabase.env.json

@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../../chat/presentation/screens/chat_with_seller_screen.dart';
+import '../../../../core/models/product_model.dart';
 
 const _bg = Color(0xFFFBF9FF);
 const _surface = Colors.white;
@@ -25,8 +27,8 @@ class ProductDetailsData {
     required this.icon,
     this.imageUrl,
     this.description,
-    this.sellerName = 'Dinda Putri',
-    this.sellerAvatar = 'DP',
+    this.sellerName = 'Seller',
+    this.sellerAvatar = 'S',
     this.size = 'L',
     this.pickupLocation = 'Lowokwaru, Malang',
   });
@@ -46,6 +48,26 @@ class ProductDetailsData {
   final String sellerAvatar;
   final String size;
   final String pickupLocation;
+
+  factory ProductDetailsData.fromModel(ProductModel model) {
+    return ProductDetailsData(
+      name: model.name,
+      brand: model.brand,
+      price: model.formattedPrice,
+      distance: model.distance,
+      rating: model.rating,
+      grade: model.grade,
+      imageUrl: model.imageUrls.isEmpty ? null : model.imageUrls.first,
+      description: model.description,
+      sellerName: model.sellerName,
+      sellerAvatar: model.sellerAvatar,
+      size: model.size,
+      pickupLocation: model.pickupLocation,
+      placeholderColor: const Color(0xFFD9E8EA),
+      iconColor: const Color(0xFF4F7880),
+      icon: Icons.checkroom_rounded,
+    );
+  }
 }
 
 class SavedProductsStore {
@@ -71,17 +93,7 @@ class SavedProductsStore {
 class ProductDetailScreen extends StatefulWidget {
   const ProductDetailScreen({
     super.key,
-    this.product = const ProductDetailsData(
-      name: 'Vintage Denim Jacket',
-      brand: 'Thrifty Archive',
-      price: 'Rp 89.000',
-      distance: '1.2 km',
-      rating: '4.9',
-      grade: 'Grade A • Like New',
-      placeholderColor: Color(0xFFD9E8EA),
-      iconColor: Color(0xFF4F7880),
-      icon: Icons.checkroom_rounded,
-    ),
+    required this.product,
     this.onAddToCart,
   });
 
@@ -132,11 +144,11 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                 fit: StackFit.expand,
                 children: [
                   if (hasImage)
-                    Image.network(
-                      product.imageUrl!,
+                    CachedNetworkImage(
+                      imageUrl: product.imageUrl!,
                       fit: BoxFit.cover,
-                      errorBuilder: (context, error, stackTrace) =>
-                          _fallbackHero(product),
+                      placeholder: (context, url) => _fallbackHero(product),
+                      errorWidget: (context, url, error) => _fallbackHero(product),
                     )
                   else
                     _fallbackHero(product),
@@ -237,7 +249,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                   Text(
                     product.description != null && product.description!.isNotEmpty
                         ? product.description!
-                        : '${product.name} from ${product.brand}. A carefully curated preloved piece with a verified condition grade, ready for its next owner.',
+                        : 'No description provided.',
                     style: GoogleFonts.plusJakartaSans(
                       fontSize: 13,
                       height: 1.6,
@@ -386,10 +398,13 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     return ColoredBox(
       color: product.placeholderColor,
       child: Center(
-        child: Icon(
-          product.icon,
-          size: 112,
-          color: product.iconColor,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(product.icon, size: 88, color: product.iconColor),
+            const SizedBox(height: 8),
+            const Text('No photo'),
+          ],
         ),
       ),
     );

@@ -21,6 +21,7 @@ class AiGradingResultScreen extends StatefulWidget {
 class _AiGradingResultScreenState extends State<AiGradingResultScreen>
     with SingleTickerProviderStateMixin {
   bool _isLoading = true;
+  bool _analysisFailed = false;
   AiGradingResult? _aiResult;
   String? _selectedCondition;
   String? _detectedCategory;
@@ -49,7 +50,10 @@ class _AiGradingResultScreenState extends State<AiGradingResultScreen>
   }
 
   Future<void> _runAiGrading() async {
-    setState(() => _isLoading = true);
+    setState(() {
+      _isLoading = true;
+      _analysisFailed = false;
+    });
     try {
       final result = await AiGradingService.instance.analyzeClothing(
         imageBytes: widget.imageBytes.first,
@@ -62,11 +66,10 @@ class _AiGradingResultScreenState extends State<AiGradingResultScreen>
         _detectedCategory = result.category;
         _isLoading = false;
       });
-    } catch (e) {
+    } catch (_) {
       if (!mounted) return;
       setState(() {
-        _selectedCondition = 'Grade A · Like new';
-        _detectedCategory = widget.category;
+        _analysisFailed = true;
         _isLoading = false;
       });
     }
@@ -95,9 +98,44 @@ class _AiGradingResultScreenState extends State<AiGradingResultScreen>
         ],
       ),
       body: SafeArea(
-        child: _isLoading ? _buildScanningView() : _buildResultView(),
+        child: _isLoading
+            ? _buildScanningView()
+            : _analysisFailed
+                ? _buildAnalysisErrorView()
+                : _buildResultView(),
       ),
     );
+  }
+
+  Widget _buildAnalysisErrorView() {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.cloud_off_outlined, size: 42),
+            const SizedBox(height: 12),
+            const Text(
+              'Condition review could not be completed. Retry before continuing.',
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 16),
+            ElevatedButton.icon(
+              onPressed: _runAiGrading,
+              icon: const Icon(Icons.refresh_rounded),
+              label: const Text('Retry review'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  String? _gradeCode(String? label) {
+    final match = RegExp(r'Grade\s+([ABCD])', caseSensitive: false)
+        .firstMatch(label ?? '');
+    return match?.group(1)?.toUpperCase();
   }
 
   Widget _buildScanningView() {
@@ -571,11 +609,17 @@ class _AiGradingResultScreenState extends State<AiGradingResultScreen>
               Expanded(
                 flex: 2,
                 child: ElevatedButton.icon(
-                  onPressed: _selectedCondition == null
+                  onPressed: _selectedCondition == null || _aiResult == null
                       ? null
                       : () {
+                          final aiGrade = _gradeCode(_aiResult!.grade);
+                          final finalGrade = _gradeCode(_selectedCondition);
+                          if (aiGrade == null || finalGrade == null) return;
                           Navigator.pop(context, {
                             'grade': _selectedCondition,
+                            'aiGrade': aiGrade,
+                            'aiConfidence': _aiResult!.gradeConfidence,
+                            'finalGrade': finalGrade,
                             'category': _updateCategory ? _detectedCategory : null,
                             'qualityScore': qualityScore,
                           });

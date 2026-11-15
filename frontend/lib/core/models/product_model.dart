@@ -1,5 +1,3 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
-
 class ProductModel {
   const ProductModel({
     required this.id,
@@ -10,16 +8,16 @@ class ProductModel {
     required this.grade,
     required this.description,
     required this.imageUrls,
-    this.distance = '1.0 km',
-    this.rating = '4.9',
-    this.sellerId = 'default_seller',
-    this.sellerName = 'Dinda Putri',
-    this.sellerAvatar = 'DP',
-    this.pickupLocation = 'Politeknik Negeri Malang',
+    required this.distance,
+    required this.rating,
+    required this.sellerId,
+    required this.sellerName,
+    required this.sellerAvatar,
+    required this.pickupLocation,
     this.latitude,
     this.longitude,
-    this.size = 'L',
-    this.status = 'active',
+    required this.size,
+    required this.status,
     this.createdAt,
   });
 
@@ -57,57 +55,40 @@ class ProductModel {
     return 'Rp ${buffer.toString().split('').reversed.join('')}';
   }
 
-  factory ProductModel.fromFirestore(
-    DocumentSnapshot<Map<String, dynamic>> snapshot,
-  ) {
-    final data = snapshot.data() ?? {};
+  factory ProductModel.fromSupabase(Map<String, dynamic> row) {
+    final sellerName = row['seller_name']?.toString() ?? 'Seller';
+    final imageUrls = row['image_urls'];
+    final createdAt = row['created_at']?.toString();
+
     return ProductModel(
-      id: snapshot.id,
-      name: data['name'] ?? '',
-      brand: data['brand'] ?? '',
-      price: (data['price'] is num) ? (data['price'] as num).toInt() : 0,
-      category: data['category'] ?? 'T-Shirt',
-      grade: data['grade'] ?? 'Grade A',
-      description: data['description'] ?? '',
-      imageUrls: List<String>.from(data['imageUrls'] ?? []),
-      distance: data['distance'] ?? '1.2 km',
-      rating: data['rating']?.toString() ?? '4.8',
-      sellerId: data['sellerId'] ?? 'seller',
-      sellerName: data['sellerName'] ?? 'Community Seller',
-      sellerAvatar: data['sellerAvatar'] ?? 'CS',
-      pickupLocation: data['pickupLocation'] ?? 'Malang, Jawa Timur',
-      latitude: (data['latitude'] as num?)?.toDouble(),
-      longitude: (data['longitude'] as num?)?.toDouble(),
-      size: data['size'] ?? 'M',
-      status: data['status'] ?? 'active',
-      createdAt: (data['createdAt'] is Timestamp)
-          ? (data['createdAt'] as Timestamp).toDate()
-          : null,
+      id: row['id']?.toString() ?? '',
+      name: row['name']?.toString() ?? '',
+      brand: row['brand']?.toString() ?? '',
+      price: (row['price'] as num?)?.toInt() ?? 0,
+      category: row['category']?.toString() ?? '',
+      grade: 'Grade ${row['final_grade']?.toString() ?? ''}'.trim(),
+      description: row['description']?.toString() ?? '',
+      imageUrls: imageUrls is List
+          ? imageUrls.whereType<String>().toList(growable: false)
+          : const <String>[],
+      distance: 'Distance unavailable',
+      rating: 'No reviews yet',
+      sellerId: row['seller_id']?.toString() ?? '',
+      sellerName: sellerName,
+      sellerAvatar: _initials(sellerName),
+      pickupLocation: row['pickup_location']?.toString() ?? '',
+      latitude: (row['latitude'] as num?)?.toDouble(),
+      longitude: (row['longitude'] as num?)?.toDouble(),
+      size: row['size']?.toString() ?? '',
+      status: row['status']?.toString() ?? '',
+      createdAt: createdAt == null ? null : DateTime.tryParse(createdAt),
     );
   }
 
-  Map<String, dynamic> toMap() {
-    return {
-      'name': name,
-      'brand': brand,
-      'price': price,
-      'category': category,
-      'grade': grade,
-      'description': description,
-      'imageUrls': imageUrls,
-      'distance': distance,
-      'rating': rating,
-      'sellerId': sellerId,
-      'sellerName': sellerName,
-      'sellerAvatar': sellerAvatar,
-      'pickupLocation': pickupLocation,
-      'latitude': latitude,
-      'longitude': longitude,
-      'size': size,
-      'status': status,
-      'createdAt': createdAt != null
-          ? Timestamp.fromDate(createdAt!)
-          : FieldValue.serverTimestamp(),
-    };
+  static String _initials(String name) {
+    final parts = name.trim().split(RegExp(r'\s+')).where((part) => part.isNotEmpty);
+    final initials = parts.take(2).map((part) => part[0].toUpperCase()).join();
+    return initials.isEmpty ? 'S' : initials;
   }
+
 }
