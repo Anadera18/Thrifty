@@ -5,6 +5,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../home/presentation/screens/location_onboarding_screen.dart';
 import '../../../../core/services/supabase_auth_service.dart';
 import '../widgets/thrifty_logo.dart';
+import 'password_reset_screen.dart';
 import 'register_screen.dart';
 
 const _bg = Color(0xFFFBF9FF);
@@ -258,11 +259,9 @@ class _LoginScreenState extends State<LoginScreen> {
             alignment: Alignment.centerRight,
             child: GestureDetector(
               onTap: () {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text(
-                      'Password reset is not available in this prototype yet.',
-                    ),
+                Navigator.of(context).push(
+                  MaterialPageRoute<void>(
+                    builder: (_) => const PasswordResetScreen(),
                   ),
                 );
               },

@@ -33,7 +33,7 @@ class _AddProductScreenState extends State<AddProductScreen> {
   final _locationController =
       TextEditingController(text: 'Kec. Lowokwaru, Malang');
 
-  final List<Uint8List> _photos = [];
+  final List<ProductPhotoUpload> _photos = [];
   String _selectedCategory = 'T-Shirt';
   String _selectedSize = 'M';
   String? _grade;
@@ -66,19 +66,40 @@ class _AddProductScreenState extends State<AddProductScreen> {
     try {
       final remaining = 6 - _photos.length;
       if (source == ImageSource.gallery) {
-        final selected = await _picker.pickMultiImage(imageQuality: 85);
+        final selected = await _picker.pickMultiImage(
+          limit: remaining,
+          maxWidth: 1600,
+          maxHeight: 1600,
+          imageQuality: 82,
+        );
         if (!mounted || selected.isEmpty) return;
-        final photos = await Future.wait(
+        final pickedBytes = await Future.wait(
           selected.take(remaining).map((photo) => photo.readAsBytes()),
         );
         if (!mounted) return;
-        setState(() => _photos.addAll(photos));
+        final accepted = <ProductPhotoUpload>[];
+        for (final bytes in pickedBytes) {
+          final photo = _photoUploadFromBytes(bytes);
+          if (photo != null) accepted.add(photo);
+        }
+        setState(() => _photos.addAll(accepted));
+        if (accepted.length != pickedBytes.length) _showPhotoFormatNotice();
       } else {
-        final photo = await _picker.pickImage(source: source, imageQuality: 85);
+        final photo = await _picker.pickImage(
+          source: source,
+          maxWidth: 1600,
+          maxHeight: 1600,
+          imageQuality: 82,
+        );
         if (!mounted || photo == null) return;
         final bytes = await photo.readAsBytes();
         if (!mounted) return;
-        setState(() => _photos.add(bytes));
+        final upload = _photoUploadFromBytes(bytes);
+        if (upload == null) {
+          _showPhotoFormatNotice();
+        } else {
+          setState(() => _photos.add(upload));
+        }
       }
     } catch (_) {
       if (mounted) {
@@ -91,6 +112,49 @@ class _AddProductScreenState extends State<AddProductScreen> {
     } finally {
       if (mounted) setState(() => _pickingPhoto = false);
     }
+  }
+
+  ProductPhotoUpload? _photoUploadFromBytes(Uint8List bytes) {
+    if (bytes.length > 5 * 1024 * 1024) return null;
+    if (bytes.length >= 3 &&
+        bytes[0] == 0xff &&
+        bytes[1] == 0xd8 &&
+        bytes[2] == 0xff) {
+      return ProductPhotoUpload(
+        bytes: bytes,
+        extension: 'jpg',
+        contentType: 'image/jpeg',
+      );
+    }
+    const pngSignature = [137, 80, 78, 71, 13, 10, 26, 10];
+    if (bytes.length >= pngSignature.length &&
+        List<int>.generate(pngSignature.length, (index) => bytes[index])
+            .join(',') ==
+            pngSignature.join(',')) {
+      return ProductPhotoUpload(
+        bytes: bytes,
+        extension: 'png',
+        contentType: 'image/png',
+      );
+    }
+    if (bytes.length >= 12 &&
+        String.fromCharCodes(bytes.sublist(0, 4)) == 'RIFF' &&
+        String.fromCharCodes(bytes.sublist(8, 12)) == 'WEBP') {
+      return ProductPhotoUpload(
+        bytes: bytes,
+        extension: 'webp',
+        contentType: 'image/webp',
+      );
+    }
+    return null;
+  }
+
+  void _showPhotoFormatNotice() {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Use JPEG, PNG, or WebP photos up to 5 MB each.'),
+      ),
+    );
   }
 
   Future<void> _showPhotoPicker() async {
@@ -135,7 +199,9 @@ class _AddProductScreenState extends State<AddProductScreen> {
     final result = await Navigator.of(context).push<dynamic>(
       MaterialPageRoute(
         builder: (_) => AiGradingResultScreen(
-          imageBytes: List<Uint8List>.unmodifiable(_photos),
+          imageBytes: List<Uint8List>.unmodifiable(
+            _photos.map((photo) => photo.bytes),
+          ),
           category: _selectedCategory,
         ),
       ),
@@ -196,6 +262,7 @@ class _AddProductScreenState extends State<AddProductScreen> {
         aiGrade: _aiGrade!,
         aiConfidence: _aiConfidence!,
         finalGrade: _finalGrade!,
+        photos: List<ProductPhotoUpload>.unmodifiable(_photos),
         description: _descriptionController.text.trim(),
         pickupLocation: _locationController.text.trim(),
         latitude: -7.9465,
@@ -221,12 +288,14 @@ class _AddProductScreenState extends State<AddProductScreen> {
       );
 
       Navigator.of(context).pop(true);
-    } catch (_) {
+    } catch (error) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: const Text(
-              'Could not publish. Your form is still here; check your connection and try again.',
+            content: Text(
+              error is ProductPublishException
+                  ? error.message
+                  : 'Could not publish. Your form is still here; check your connection and try again.',
             ),
             backgroundColor: Colors.red.shade700,
           ),
@@ -400,7 +469,7 @@ class _AddProductScreenState extends State<AddProductScreen> {
               child: Stack(
                 fit: StackFit.expand,
                 children: [
-                  Image.memory(_photos[index], fit: BoxFit.cover),
+                  Image.memory(_photos[index].bytes, fit: BoxFit.cover),
                   Positioned(
                     top: 4,
                     right: 4,
@@ -534,9 +603,11 @@ class _AddProductScreenState extends State<AddProductScreen> {
             ),
             child: const Row(
               children: [
-                Icon(Icons.image_not_supported_outlined, color: _muted),
+                Icon(Icons.cloud_upload_outlined, color: _muted),
                 SizedBox(width: 8),
-                Expanded(child: Text('No photo will be attached in this step.')),
+                Expanded(
+                  child: Text('Photos upload securely when you publish this listing.'),
+                ),
               ],
             ),
           ),

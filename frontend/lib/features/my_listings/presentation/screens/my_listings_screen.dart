@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -574,11 +575,11 @@ class _ListingCard extends StatelessWidget {
               width: 72,
               height: 72,
               child: hasImage
-                  ? Image.network(
-                      listing.imageUrls.first,
+                  ? CachedNetworkImage(
+                      imageUrl: listing.imageUrls.first,
                       fit: BoxFit.cover,
-                      errorBuilder: (context, error, stackTrace) =>
-                          _fallbackCover(),
+                      placeholder: (context, url) => _fallbackCover(),
+                      errorWidget: (context, url, error) => _fallbackCover(),
                     )
                   : _fallbackCover(),
             ),

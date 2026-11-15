@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -672,11 +673,11 @@ class _ProductCard extends StatelessWidget {
                 fit: StackFit.expand,
                 children: [
                   if (hasImage)
-                    Image.network(
-                      product.imageUrls.first,
+                    CachedNetworkImage(
+                      imageUrl: product.imageUrls.first,
                       fit: BoxFit.cover,
-                      errorBuilder: (context, error, stackTrace) =>
-                          _fallbackCover(),
+                      placeholder: (context, url) => _fallbackCover(),
+                      errorWidget: (context, url, error) => _fallbackCover(),
                     )
                   else
                     _fallbackCover(),
@@ -944,12 +945,14 @@ class _CartScreenState extends State<_CartScreen> {
                       ClipRRect(
                         borderRadius: BorderRadius.circular(12),
                         child: item.imageUrls.isNotEmpty
-                            ? Image.network(
-                                item.imageUrls.first,
+                            ? CachedNetworkImage(
+                                imageUrl: item.imageUrls.first,
                                 width: 58,
                                 height: 58,
                                 fit: BoxFit.cover,
-                                errorBuilder: (context, error, stackTrace) =>
+                                placeholder: (context, url) =>
+                                    _cartPlaceholder(),
+                                errorWidget: (context, url, error) =>
                                     _cartPlaceholder(),
                               )
                             : _cartPlaceholder(),

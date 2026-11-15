@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../../chat/presentation/screens/chat_with_seller_screen.dart';
@@ -143,11 +144,11 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                 fit: StackFit.expand,
                 children: [
                   if (hasImage)
-                    Image.network(
-                      product.imageUrl!,
+                    CachedNetworkImage(
+                      imageUrl: product.imageUrl!,
                       fit: BoxFit.cover,
-                      errorBuilder: (context, error, stackTrace) =>
-                          _fallbackHero(product),
+                      placeholder: (context, url) => _fallbackHero(product),
+                      errorWidget: (context, url, error) => _fallbackHero(product),
                     )
                   else
                     _fallbackHero(product),

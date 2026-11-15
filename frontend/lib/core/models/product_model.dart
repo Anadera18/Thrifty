@@ -1,5 +1,3 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
-
 class ProductModel {
   const ProductModel({
     required this.id,
@@ -10,16 +8,16 @@ class ProductModel {
     required this.grade,
     required this.description,
     required this.imageUrls,
-    this.distance = '1.0 km',
-    this.rating = '4.9',
-    this.sellerId = 'default_seller',
-    this.sellerName = 'Dinda Putri',
-    this.sellerAvatar = 'DP',
-    this.pickupLocation = 'Politeknik Negeri Malang',
+    required this.distance,
+    required this.rating,
+    required this.sellerId,
+    required this.sellerName,
+    required this.sellerAvatar,
+    required this.pickupLocation,
     this.latitude,
     this.longitude,
-    this.size = 'L',
-    this.status = 'active',
+    required this.size,
+    required this.status,
     this.createdAt,
   });
 
@@ -55,35 +53,6 @@ class ProductModel {
       }
     }
     return 'Rp ${buffer.toString().split('').reversed.join('')}';
-  }
-
-  factory ProductModel.fromFirestore(
-    DocumentSnapshot<Map<String, dynamic>> snapshot,
-  ) {
-    final data = snapshot.data() ?? {};
-    return ProductModel(
-      id: snapshot.id,
-      name: data['name'] ?? '',
-      brand: data['brand'] ?? '',
-      price: (data['price'] is num) ? (data['price'] as num).toInt() : 0,
-      category: data['category'] ?? 'T-Shirt',
-      grade: data['grade'] ?? 'Grade A',
-      description: data['description'] ?? '',
-      imageUrls: List<String>.from(data['imageUrls'] ?? []),
-      distance: data['distance'] ?? '1.2 km',
-      rating: data['rating']?.toString() ?? '4.8',
-      sellerId: data['sellerId'] ?? 'seller',
-      sellerName: data['sellerName'] ?? 'Community Seller',
-      sellerAvatar: data['sellerAvatar'] ?? 'CS',
-      pickupLocation: data['pickupLocation'] ?? 'Malang, Jawa Timur',
-      latitude: (data['latitude'] as num?)?.toDouble(),
-      longitude: (data['longitude'] as num?)?.toDouble(),
-      size: data['size'] ?? 'M',
-      status: data['status'] ?? 'active',
-      createdAt: (data['createdAt'] is Timestamp)
-          ? (data['createdAt'] as Timestamp).toDate()
-          : null,
-    );
   }
 
   factory ProductModel.fromSupabase(Map<String, dynamic> row) {
@@ -122,28 +91,4 @@ class ProductModel {
     return initials.isEmpty ? 'S' : initials;
   }
 
-  Map<String, dynamic> toMap() {
-    return {
-      'name': name,
-      'brand': brand,
-      'price': price,
-      'category': category,
-      'grade': grade,
-      'description': description,
-      'imageUrls': imageUrls,
-      'distance': distance,
-      'rating': rating,
-      'sellerId': sellerId,
-      'sellerName': sellerName,
-      'sellerAvatar': sellerAvatar,
-      'pickupLocation': pickupLocation,
-      'latitude': latitude,
-      'longitude': longitude,
-      'size': size,
-      'status': status,
-      'createdAt': createdAt != null
-          ? Timestamp.fromDate(createdAt!)
-          : FieldValue.serverTimestamp(),
-    };
-  }
 }

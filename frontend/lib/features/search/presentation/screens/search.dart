@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:thrifty/features/product_detail/presentation/screens/product_detail.dart';
 import '../../../../core/models/product_model.dart';
 import '../../../../core/services/supabase_product_service.dart';
@@ -679,7 +680,12 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
                                         width: double.infinity,
                                         child: product.imageUrls.isEmpty
                                             ? const Center(child: Text('No photo', style: TextStyle(color: Colors.grey)))
-                                            : Image.network(product.imageUrls.first, fit: BoxFit.cover, errorBuilder: (_, __, ___) => const Center(child: Text('No photo', style: TextStyle(color: Colors.grey)))),
+                                            : CachedNetworkImage(
+                                                imageUrl: product.imageUrls.first,
+                                                fit: BoxFit.cover,
+                                                placeholder: (_, __) => const Center(child: CircularProgressIndicator()),
+                                                errorWidget: (_, __, ___) => const Center(child: Text('No photo', style: TextStyle(color: Colors.grey))),
+                                              ),
                                       ),
                                     ),
                                     Padding(
