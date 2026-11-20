@@ -2,10 +2,13 @@ import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:latlong2/latlong.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../../ai_grading/presentation/screens/ai_grading_result_screen.dart';
+import '../../../../core/services/location_service.dart';
 import '../../../../core/services/supabase_product_service.dart';
+import '../../../../shared/widgets/osm_location_picker_sheet.dart';
 
 const Color _green = Color(0xFF14532D);
 const Color _darkTeal = Color(0xFF0E3436);
@@ -32,6 +35,9 @@ class _AddProductScreenState extends State<AddProductScreen> {
   final _descriptionController = TextEditingController();
   final _locationController =
       TextEditingController(text: 'Kec. Lowokwaru, Malang');
+  double? _selectedLatitude;
+  double? _selectedLongitude;
+  bool _hasChosenLocation = false;
 
   final List<ProductPhotoUpload> _photos = [];
   String _selectedCategory = 'T-Shirt';
@@ -242,6 +248,29 @@ class _AddProductScreenState extends State<AddProductScreen> {
       setState(() => _currentStep = 1);
       return;
     }
+    if (!_hasChosenLocation ||
+        _selectedLatitude == null ||
+        _selectedLongitude == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Set a pickup location on the map before publishing.',
+          ),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+    if (!LocationService.isValidLatitude(_selectedLatitude!) ||
+        !LocationService.isValidLongitude(_selectedLongitude!)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('The chosen pickup coordinates are not valid.'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
 
     setState(() => _isPublishing = true);
 
@@ -265,8 +294,8 @@ class _AddProductScreenState extends State<AddProductScreen> {
         photos: List<ProductPhotoUpload>.unmodifiable(_photos),
         description: _descriptionController.text.trim(),
         pickupLocation: _locationController.text.trim(),
-        latitude: -7.9465,
-        longitude: 112.6156,
+        latitude: LocationService.roundCoordinate(_selectedLatitude!),
+        longitude: LocationService.roundCoordinate(_selectedLongitude!),
       );
 
       if (!mounted) return;
@@ -683,13 +712,64 @@ class _AddProductScreenState extends State<AddProductScreen> {
             ),
           ),
           const SizedBox(height: 14),
-          _buildInputLabel('Pickup / Meetup Location'),
-          TextFormField(
-            controller: _locationController,
-            decoration: _inputDecoration('e.g. Lowokwaru / Suhat Malang'),
-            validator: (v) => v == null || v.trim().isEmpty
-                ? 'Enter a pickup location'
-                : null,
+          _buildInputLabel('Pickup / Meetup Location *'),
+          Row(
+            children: [
+              Expanded(
+                child: TextFormField(
+                  controller: _locationController,
+                  decoration: _inputDecoration('e.g. Lowokwaru / Suhat Malang'),
+                  validator: (v) => v == null || v.trim().isEmpty
+                      ? 'Enter a pickup location'
+                      : null,
+                ),
+              ),
+              const SizedBox(width: 8),
+              IconButton.filled(
+                onPressed: () async {
+                  final res = await OsmLocationPickerSheet.show(
+                    context,
+                    initialPoint: _hasChosenLocation &&
+                            _selectedLatitude != null &&
+                            _selectedLongitude != null
+                        ? LatLng(_selectedLatitude!, _selectedLongitude!)
+                        : null,
+                    initialAddress: _locationController.text.trim(),
+                  );
+                  if (res != null) {
+                    setState(() {
+                      _locationController.text = res.address;
+                      _selectedLatitude = res.point.latitude;
+                      _selectedLongitude = res.point.longitude;
+                      _hasChosenLocation = true;
+                    });
+                  }
+                },
+                style: IconButton.styleFrom(
+                  backgroundColor: _darkTeal,
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  padding: const EdgeInsets.all(14),
+                ),
+                icon: const Icon(Icons.map_rounded),
+                tooltip: 'Pick on OpenStreetMap',
+              ),
+            ],
+          ),
+          Padding(
+            padding: const EdgeInsets.only(top: 4, left: 4),
+            child: Text(
+              _hasChosenLocation
+                  ? 'Approximate pickup area set (~100 m). Tap the map icon to adjust.'
+                  : 'No location chosen yet. Tap the map icon to place your pickup pin.',
+              style: GoogleFonts.plusJakartaSans(
+                fontSize: 11,
+                color: _hasChosenLocation ? _muted : Colors.red.shade700,
+                fontWeight: _hasChosenLocation ? FontWeight.w400 : FontWeight.w600,
+              ),
+            ),
           ),
           const SizedBox(height: 28),
           SizedBox(

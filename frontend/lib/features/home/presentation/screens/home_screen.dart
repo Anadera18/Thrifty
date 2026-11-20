@@ -14,7 +14,12 @@ import '../../../product_detail/presentation/screens/product_detail.dart';
 import '../../../saved_items/presentation/screens/saved_items_screen.dart';
 import '../../../../core/models/product_model.dart';
 import '../../../../core/services/supabase_product_service.dart';
+import '../../../../core/services/location_service.dart';
+import '../../../../core/state/user_location_provider.dart';
+import 'package:latlong2/latlong.dart';
+import '../../../../shared/widgets/osm_location_picker_sheet.dart';
 import 'filter_screen.dart';
+import 'nearby_map_screen.dart';
 
 const _background = Color(0xFFFBF9FF);
 const _surface = Colors.white;
@@ -45,12 +50,67 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   String _activeCategory = 'All';
   RangeValues _priceRange = const RangeValues(0, 300000);
   String _condition = 'All';
+  double? _maxDistanceKm; // null means any distance
+  bool _sortByNearest = false;
 
   @override
   void initState() {
     super.initState();
     SavedProductsStore.items.addListener(_refreshSavedProducts);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final loc = ref.read(userLocationProvider);
+      if (!loc.hasLocation && !loc.isLocating) {
+        ref.read(userLocationProvider.notifier).detect();
+      }
+    });
     _loadProducts();
+  }
+
+  Future<void> _initUserLocation() async {
+    await ref.read(userLocationProvider.notifier).detect();
+  }
+
+  Future<void> _setManualLocation() async {
+    final loc = ref.read(userLocationProvider);
+    final res = await OsmLocationPickerSheet.show(
+      context,
+      initialPoint: loc.point,
+      initialAddress: loc.hasLocation ? loc.label : null,
+    );
+    if (res == null || !mounted) return;
+    ref.read(userLocationProvider.notifier).setManual(res.point, res.address);
+  }
+
+  /// Distances are shown when the buyer's position is known; products without
+  /// coordinates keep their neutral placeholder instead of a fake distance.
+  String _distanceLabelFor(ProductModel product, LatLng? userLocation) {
+    if (userLocation == null ||
+        product.latitude == null ||
+        product.longitude == null) {
+      return product.distance;
+    }
+    final km = LocationService.instance.calculateDistanceKm(
+      userLocation.latitude,
+      userLocation.longitude,
+      product.latitude!,
+      product.longitude!,
+    );
+    return LocationService.instance.formatDistance(km);
+  }
+
+  double? _distanceKmFor(ProductModel product, LatLng? userLocation) {
+    if (userLocation == null ||
+        product.latitude == null ||
+        product.longitude == null) {
+      return null;
+    }
+    return LocationService.instance.calculateDistanceKm(
+      userLocation.latitude,
+      userLocation.longitude,
+      product.latitude!,
+      product.longitude!,
+    );
   }
 
   Future<void> _loadProducts() async {
@@ -90,6 +150,16 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   @override
   Widget build(BuildContext context) {
     final isSeller = ref.watch(currentSupabaseRoleProvider) == 'seller';
+    final userLocation = ref.watch(userLocationProvider);
+    final locationPoint = userLocation.point;
+    ref.listen<UserLocationState>(userLocationProvider, (previous, next) {
+      if (next.message != null && next.message != previous?.message) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(next.message!)),
+        );
+        ref.read(userLocationProvider.notifier).clearMessage();
+      }
+    });
     return Scaffold(
       backgroundColor: _background,
       body: SafeArea(
@@ -139,8 +209,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                   delegate: SliverChildBuilderDelegate(
                     (context, index) {
                       final product = _visibleProducts[index];
+                      final displayProduct = product.copyWith(
+                        distance: _distanceLabelFor(product, locationPoint),
+                      );
                       return _ProductCard(
-                        product: product,
+                        product: displayProduct,
                         inCart: _cart.any((item) => item.id == product.id),
                         onAddToCart: () => _addToCart(product),
                         onOpen: () => _openProduct(product),
@@ -400,6 +473,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   }
 
   Widget _buildRadiusCard() {
+    final userLocation = ref.watch(userLocationProvider);
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
@@ -407,9 +481,176 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         borderRadius: BorderRadius.circular(18),
         border: Border.all(color: _line),
       ),
-      child: Text(
-        'Distance filtering is not available yet. Each listing shows its pickup location.',
-        style: GoogleFonts.plusJakartaSans(fontSize: 12, color: _muted),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.near_me_rounded, color: _green, size: 18),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  userLocation.isLocating
+                      ? 'Detecting your location...'
+                      : userLocation.hasLocation
+                          ? 'Near ${userLocation.label}'
+                          : 'Location not set',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: GoogleFonts.plusJakartaSans(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                    color: _ink,
+                  ),
+                ),
+              ),
+              IconButton(
+                visualDensity: VisualDensity.compact,
+                icon: const Icon(Icons.refresh_rounded, size: 18, color: _muted),
+                tooltip: 'Use my current location',
+                onPressed: _initUserLocation,
+              ),
+              if (!userLocation.hasLocation && !userLocation.isLocating)
+                IconButton(
+                  visualDensity: VisualDensity.compact,
+                  icon: const Icon(Icons.edit_location_alt_outlined,
+                      size: 18, color: _darkTeal),
+                  tooltip: 'Set location manually',
+                  onPressed: _setManualLocation,
+                ),
+              FilledButton.tonalIcon(
+                onPressed: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => NearbyMapScreen(
+                        products: _products,
+                        userLocation: userLocation.point,
+                      ),
+                    ),
+                  );
+                },
+                style: FilledButton.styleFrom(
+                  backgroundColor: _cyanSoft,
+                  foregroundColor: _darkTeal,
+                  visualDensity: VisualDensity.compact,
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 0),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+                icon: const Icon(Icons.map_outlined, size: 16),
+                label: Text(
+                  'Map',
+                  style: GoogleFonts.plusJakartaSans(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              Text(
+                'Radius filter:',
+                style: GoogleFonts.plusJakartaSans(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
+                  color: _muted,
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: Row(
+                    children: [
+                      _radiusChip('All', null),
+                      const SizedBox(width: 6),
+                      _radiusChip('3 km', 3.0),
+                      const SizedBox(width: 6),
+                      _radiusChip('5 km', 5.0),
+                      const SizedBox(width: 6),
+                      _radiusChip('10 km', 10.0),
+                      const SizedBox(width: 6),
+                      _radiusChip('25 km', 25.0),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              const Icon(Icons.swap_vert_rounded, size: 16, color: _muted),
+              const SizedBox(width: 6),
+              Text(
+                'Sort:',
+                style: GoogleFonts.plusJakartaSans(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
+                  color: _muted,
+                ),
+              ),
+              const SizedBox(width: 8),
+              ChoiceChip(
+                label: Text(
+                  'Default',
+                  style: GoogleFonts.plusJakartaSans(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                selected: !_sortByNearest,
+                onSelected: (_) => setState(() => _sortByNearest = false),
+                visualDensity: VisualDensity.compact,
+              ),
+              const SizedBox(width: 6),
+              ChoiceChip(
+                label: Text(
+                  'Nearest first',
+                  style: GoogleFonts.plusJakartaSans(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                selected: _sortByNearest,
+                onSelected: (userLocation.hasLocation)
+                    ? (_) => setState(() => _sortByNearest = true)
+                    : null,
+                visualDensity: VisualDensity.compact,
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _radiusChip(String label, double? km) {
+    final isSelected = _maxDistanceKm == km;
+    return InkWell(
+      onTap: () => setState(() => _maxDistanceKm = km),
+      borderRadius: BorderRadius.circular(10),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+        decoration: BoxDecoration(
+          color: isSelected ? _darkTeal : _background,
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(
+            color: isSelected ? _darkTeal : _line,
+          ),
+        ),
+        child: Text(
+          label,
+          style: GoogleFonts.plusJakartaSans(
+            fontSize: 11,
+            fontWeight: isSelected ? FontWeight.w700 : FontWeight.w600,
+            color: isSelected ? Colors.white : _muted,
+          ),
+        ),
       ),
     );
   }
@@ -518,7 +759,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
   List<ProductModel> get _visibleProducts {
     final query = _searchController.text.trim().toLowerCase();
-    return _products.where((product) {
+    final userLocation = ref.read(userLocationProvider).point;
+
+    var filtered = _products.where((product) {
       final matchesQuery = query.isEmpty ||
           product.name.toLowerCase().contains(query) ||
           product.brand.toLowerCase().contains(query);
@@ -534,12 +777,42 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           ? (grade.contains('GRADE A') || grade.contains('MINT') || grade.contains('LIKE NEW'))
           : grade.contains('GRADE $_condition');
 
+      final matchesRadius = _maxDistanceKm == null
+          ? true
+          : (product.latitude == null ||
+                  product.longitude == null ||
+                  userLocation == null)
+              // Products without coordinates, or when we have no buyer
+              // location, are excluded from radius-filtered results.
+              ? false
+              : (LocationService.instance.calculateDistanceKm(
+                    userLocation.latitude,
+                    userLocation.longitude,
+                    product.latitude!,
+                    product.longitude!,
+                  ) <=
+                  _maxDistanceKm!);
+
       return matchesQuery &&
           matchesCategory &&
           product.price >= _priceRange.start &&
           product.price <= _priceRange.end &&
-          matchesCondition;
+          matchesCondition &&
+          matchesRadius;
     }).toList();
+
+    if (_sortByNearest && userLocation != null) {
+      filtered.sort((a, b) {
+        final da = _distanceKmFor(a, userLocation);
+        final db = _distanceKmFor(b, userLocation);
+        if (da == null && db == null) return 0;
+        if (da == null) return 1; // products without coordinates go last
+        if (db == null) return -1;
+        return da.compareTo(db);
+      });
+    }
+
+    return filtered;
   }
 
   void _openProfile(BuildContext context) {
@@ -577,8 +850,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     );
   }
 
-  ProductDetailsData _productDetails(ProductModel product) =>
-      ProductDetailsData.fromModel(product);
+  ProductDetailsData _productDetails(ProductModel product) {
+    final withDistance = product.copyWith(
+      distance: _distanceLabelFor(product, ref.read(userLocationProvider).point),
+    );
+    return ProductDetailsData.fromModel(withDistance);
+  }
 
   void _toggleSaved(ProductModel product) {
     final details = _productDetails(product);

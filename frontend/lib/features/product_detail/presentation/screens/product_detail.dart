@@ -1,9 +1,13 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_map/flutter_map.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:latlong2/latlong.dart';
 
 import '../../../chat/presentation/screens/chat_with_seller_screen.dart';
 import '../../../../core/models/product_model.dart';
+import '../../../../shared/config/map_config.dart';
+import '../../../../shared/widgets/osm_map_view.dart';
 
 const _bg = Color(0xFFFBF9FF);
 const _surface = Colors.white;
@@ -31,6 +35,8 @@ class ProductDetailsData {
     this.sellerAvatar = 'S',
     this.size = 'L',
     this.pickupLocation = 'Lowokwaru, Malang',
+    this.latitude,
+    this.longitude,
   });
 
   final String name;
@@ -48,6 +54,8 @@ class ProductDetailsData {
   final String sellerAvatar;
   final String size;
   final String pickupLocation;
+  final double? latitude;
+  final double? longitude;
 
   factory ProductDetailsData.fromModel(ProductModel model) {
     return ProductDetailsData(
@@ -63,6 +71,8 @@ class ProductDetailsData {
       sellerAvatar: model.sellerAvatar,
       size: model.size,
       pickupLocation: model.pickupLocation,
+      latitude: model.latitude,
+      longitude: model.longitude,
       placeholderColor: const Color(0xFFD9E8EA),
       iconColor: const Color(0xFF4F7880),
       icon: Icons.checkroom_rounded,
@@ -281,7 +291,15 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                       'Pickup point',
                       product.pickupLocation,
                     ),
+                    const Divider(height: 18, color: _line),
+                    _infoRow(
+                      Icons.navigation_outlined,
+                      'Distance',
+                      product.distance,
+                    ),
                   ]),
+                  const SizedBox(height: 16),
+                  _buildPickupMapCard(product),
                   const SizedBox(height: 16),
                   _sellerCard(product.sellerName, product.sellerAvatar),
                   const SizedBox(height: 16),
@@ -324,10 +342,10 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
         top: false,
         child: Container(
           padding: const EdgeInsets.fromLTRB(18, 11, 18, 12),
-          decoration: BoxDecoration(
+          decoration: const BoxDecoration(
             color: _surface,
-            border: const Border(top: BorderSide(color: _line)),
-            boxShadow: const [
+            border: Border(top: BorderSide(color: _line)),
+            boxShadow: [
               BoxShadow(
                 color: Color(0x0D000000),
                 blurRadius: 12,
@@ -520,6 +538,123 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
       ],
     ),
   );
+
+  Widget _buildPickupMapCard(ProductDetailsData product) {
+    final hasCoordinates =
+        product.latitude != null && product.longitude != null;
+    final point = hasCoordinates
+        ? LatLng(product.latitude!, product.longitude!)
+        : null;
+
+    return Container(
+      decoration: BoxDecoration(
+        color: _surface,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: _line),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(14, 12, 14, 8),
+            child: Row(
+              children: [
+                const Icon(Icons.explore_outlined, color: _teal, size: 18),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'P2P Meetup Zone (OpenStreetMap)',
+                    style: GoogleFonts.plusJakartaSans(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w800,
+                      color: _ink,
+                    ),
+                  ),
+                ),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: _cyan,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Text(
+                    product.distance,
+                    style: GoogleFonts.plusJakartaSans(
+                      fontSize: 10,
+                      fontWeight: FontWeight.w700,
+                      color: _teal,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          SizedBox(
+            height: 160,
+            child: Stack(
+              children: [
+                OsmMapView(
+                  point: point,
+                  zoom: MapConfig.pinZoom,
+                  interactive: true,
+                  layers: point == null
+                      ? const []
+                      : [
+                          CircleLayer(
+                            circles: [
+                              CircleMarker(
+                                point: point,
+                                radius: 40,
+                                useRadiusInMeter: false,
+                                color: _green.withValues(alpha: 0.18),
+                                borderColor: _green,
+                                borderStrokeWidth: 2,
+                              ),
+                            ],
+                          ),
+                        ],
+                ),
+                if (hasCoordinates)
+                  Positioned(
+                    bottom: 8,
+                    left: 8,
+                    right: 8,
+                    child: Container(
+                      padding:
+                          const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: 0.92),
+                        borderRadius: BorderRadius.circular(10),
+                        boxShadow: const [
+                          BoxShadow(color: Colors.black12, blurRadius: 4),
+                        ],
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.shield_outlined, size: 14, color: _green),
+                          const SizedBox(width: 6),
+                          Expanded(
+                            child: Text(
+                              'Approximate safe pickup area for person-to-person meetup',
+                              style: GoogleFonts.plusJakartaSans(
+                                fontSize: 10,
+                                fontWeight: FontWeight.w600,
+                                color: _ink,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 
   Widget _sectionTitle(String title) => Text(
     title,

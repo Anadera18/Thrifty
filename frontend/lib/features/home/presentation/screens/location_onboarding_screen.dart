@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:geolocator/geolocator.dart';
 
 import '../../../auth/presentation/widgets/thrifty_logo.dart';
+import '../../../../core/state/user_location_provider.dart';
 import '../widgets/location_radar.dart';
 import 'home_screen.dart';
 
@@ -14,32 +15,20 @@ const _teal = Color(0xFF0E7490);
 const _darkTeal = Color(0xFF0E3436);
 const _green = Color(0xFF065F0B);
 
-class LocationOnboardingScreen extends StatelessWidget {
+class LocationOnboardingScreen extends ConsumerWidget {
   const LocationOnboardingScreen({super.key});
 
+  /// Moves on to Home and asks for the position there. Deliberately no longer
+  /// requests the permission here and discards the result: the shared
+  /// [userLocationProvider] handles granted/denied/permanently-denied and
+  /// offers a manual fallback.
   void _onAllowLocation(BuildContext context) {
     Navigator.of(context)
         .pushReplacement(MaterialPageRoute(builder: (_) => const HomeScreen()));
-
-    // Let the home screen render before the browser asks for location access.
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _requestLocationPermission();
-    });
-  }
-
-  Future<void> _requestLocationPermission() async {
-    try {
-      final permission = await Geolocator.checkPermission();
-      if (permission == LocationPermission.denied) {
-        await Geolocator.requestPermission();
-      }
-    } catch (_) {
-      // Continue without location when the platform does not support it.
-    }
   }
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     return Scaffold(
       backgroundColor: _bg,
       body: SafeArea(
