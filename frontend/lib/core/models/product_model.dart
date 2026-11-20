@@ -71,7 +71,10 @@ class ProductModel {
       imageUrls: imageUrls is List
           ? imageUrls.whereType<String>().toList(growable: false)
           : const <String>[],
-      distance: 'Distance unavailable',
+      // The real distance is computed on the device from the buyer's position.
+      // This is only a neutral placeholder for rows that have no coordinates
+      // or before the buyer's location is known.
+      distance: 'Location not set',
       rating: 'No reviews yet',
       sellerId: row['seller_id']?.toString() ?? '',
       sellerName: sellerName,
@@ -82,6 +85,32 @@ class ProductModel {
       size: row['size']?.toString() ?? '',
       status: row['status']?.toString() ?? '',
       createdAt: createdAt == null ? null : DateTime.tryParse(createdAt),
+    );
+  }
+
+  ProductModel copyWith({
+    String? distance,
+  }) {
+    return ProductModel(
+      id: id,
+      name: name,
+      brand: brand,
+      price: price,
+      category: category,
+      grade: grade,
+      description: description,
+      imageUrls: imageUrls,
+      distance: distance ?? this.distance,
+      rating: rating,
+      sellerId: sellerId,
+      sellerName: sellerName,
+      sellerAvatar: sellerAvatar,
+      pickupLocation: pickupLocation,
+      latitude: latitude,
+      longitude: longitude,
+      size: size,
+      status: status,
+      createdAt: createdAt,
     );
   }
 

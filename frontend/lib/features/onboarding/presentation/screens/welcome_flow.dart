@@ -336,7 +336,7 @@ class _WelcomeIllustration extends StatelessWidget {
           top: 42,
           child: Transform.rotate(
             angle: -0.1,
-            child: _MiniCard(
+            child: const _MiniCard(
               icon: Icons.checkroom_outlined,
               title: 'Pre-loved',
               color: Colors.white,
@@ -348,7 +348,7 @@ class _WelcomeIllustration extends StatelessWidget {
           bottom: 42,
           child: Transform.rotate(
             angle: 0.08,
-            child: _MiniCard(
+            child: const _MiniCard(
               icon: Icons.location_on_outlined,
               title: 'Near you',
               color: Colors.white,
